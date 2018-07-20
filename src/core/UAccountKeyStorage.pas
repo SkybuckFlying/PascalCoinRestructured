@@ -7,7 +7,7 @@ unit UAccountKeyStorage;
 interface
 
 uses
-  Classes, SysUtils, UAccounts, UThread, UBaseTypes;
+  Classes, SysUtils, UAccounts, UThread, UBaseTypes, UAccountKey;
 
 type
   TAccountKeyStorateData = record
@@ -37,7 +37,7 @@ type
 implementation
 
 uses
-  ULog;
+  ULog, UBaseType;
 
 var _aks : TAccountKeyStorage = Nil;
 

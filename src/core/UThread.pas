@@ -25,7 +25,7 @@ uses
 {$ELSE}
   {$IFDEF LINUX}cthreads,{$ENDIF}
 {$ENDIF}
-  Classes, SyncObjs, UBaseTypes;
+  Classes, SyncObjs, UBaseTypes, UTickCount;
 
 {$I config.inc}
 
@@ -94,7 +94,7 @@ Type
 implementation
 
 uses
-  SysUtils, ULog, UConst;
+  SysUtils, ULog, UConst, UPlatform;
 
 { TPCThread }
 

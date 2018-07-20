@@ -82,7 +82,7 @@ Const
 
 implementation
 
-uses SysUtils;
+uses SysUtils, UPtrInt;
 
 var _logs : TList;
 Type PLogData = ^TLogData;

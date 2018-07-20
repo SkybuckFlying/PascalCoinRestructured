@@ -21,14 +21,6 @@ interface
 
 {$I config.inc}
 
-{$IFNDEF FPC}
-  // See http://wiki.freepascal.org/Code_Conversion_Guide
-type
-  PtrInt = integer;
-  PtrUInt = cardinal;
-  TThreadID = Cardinal;
-{$ENDIF}
-
 Const
   CT_Genesis_Magic_String_For_Old_Block_Hash :
     AnsiString =
