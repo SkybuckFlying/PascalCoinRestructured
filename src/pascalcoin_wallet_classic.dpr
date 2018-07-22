@@ -62,7 +62,6 @@ uses
   UFRMRandomOperations in 'gui-classic\UFRMRandomOperations.pas' {FRMRandomOperations},
   UNetProtocol in 'core\NetProtocol\UNetProtocol.pas',
   UNetProtocolConst in 'core\NetProtocol\UNetProtocolConst.pas',
-  UNetProtocolTypes in 'core\NetProtocol\UNetProtocolTypes.pas',
   UNetworkAdjustedTime in 'core\NetProtocol\UNetworkAdjustedTime.pas',
   UNetData in 'core\NetProtocol\UNetData.pas',
   UNetConnection in 'core\NetProtocol\UNetConnection.pas',
@@ -82,7 +81,6 @@ uses
   UAccountKey in 'core\Accounts\UAccountKey.pas',
   URawBytes in 'core\BaseTypes\URawBytes.pas',
   UTickCount in 'core\BaseTypes\UTickCount.pas',
-  UNetProtocolVersion in 'core\NetProtocol\UNetProtocolVersion.pas',
   UOrderedRawList in 'core\Lists\UOrderedRawList.pas',
   UOperationsHashTree in 'core\Lists\UOperationsHashTree.pas',
   UPCOperation in 'core\BlockChain\UPCOperation.pas',
@@ -128,7 +126,16 @@ uses
   UPtrUInt in 'core\BaseTypes\UPtrUInt.pas',
   UPCBank in 'core\BlockChain\UPCBank.pas',
   UStorage in 'core\BlockChain\UStorage.pas',
-  UOrphan in 'core\BlockChain\UOrphan.pas';
+  UOrphan in 'core\BlockChain\UOrphan.pas',
+  UPCBankLog in 'core\BlockChain\UPCBankLog.pas',
+  UStorageClass in 'core\BlockChain\UStorageClass.pas',
+  UPCBankNotify in 'core\BlockChain\UPCBankNotify.pas',
+  UNetProtocolVersion in 'core\NetProtocol\Types\UNetProtocolVersion.pas',
+  UNetHeaderData in 'core\NetProtocol\Types\UNetHeaderData.pas',
+  UNetTransferType in 'core\NetProtocol\Types\UNetTransferType.pas',
+  UNetMessage_Hello in 'core\NetProtocol\Types\UNetMessage_Hello.pas',
+  UNetRequestRegistered in 'core\NetProtocol\Types\UNetRequestRegistered.pas',
+  UProcessReservedAreaMessage in 'core\NetProtocol\UProcessReservedAreaMessage.pas';
 
 {$R *.res}
 

@@ -20,7 +20,7 @@ unit UWallet;
 interface
 
 uses
-  Classes, USettings, UBlockChain, UAccounts, UCrypto, UBaseTypes;
+  Classes, USettings, UBlockChain, UAccounts, UCrypto, UBaseTypes, UAccountKey, UOrderedAccountKeysList, UPCSafeBox;
 
 Type
   TWalletKey = Record
@@ -125,7 +125,7 @@ var
 implementation
 
 uses
-  SysUtils, UConst, ULog, UAES, UFolderHelper;
+  SysUtils, UConst, ULog, UAES, UFolderHelper, UAccountComp, UBaseType, UStreamOp;
 
 Const
   CT_PrivateKeyFile_Magic = 'TWalletKeys';

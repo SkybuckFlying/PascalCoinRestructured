@@ -21,6 +21,17 @@ type
   end;
   TMultiOpChangesInfo = Array of TMultiOpChangeInfo;
 
+var
+  CT_TMultiOpChangeInfo_NUL : TMultiOpChangeInfo;
+
 implementation
+
+initialization
+  Initialize(CT_TMultiOpChangeInfo_NUL);
+  with CT_TMultiOpChangeInfo_NUL do
+  begin
+    Seller_Account:=-1;
+    Account_Price:=-1;
+  end;
 
 end.

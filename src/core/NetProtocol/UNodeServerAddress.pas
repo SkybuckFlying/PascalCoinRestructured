@@ -2,6 +2,9 @@ unit UNodeServerAddress;
 
 interface
 
+uses
+  UNetConnection;
+
 type
   TNodeServerAddress = Record
     ip : AnsiString;

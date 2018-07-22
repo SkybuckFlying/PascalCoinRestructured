@@ -19,7 +19,7 @@ unit UOpTransaction;
 
 interface
 
-Uses UCrypto, UBlockChain, Classes, UAccounts;
+Uses UCrypto, UBlockChain, Classes, UAccounts, UAccountKey, UPCOperation, UOperationResume, UAccountPreviousBlockInfo, UPCSafeBoxTransaction, UOpChangeAccountInfoType;
 
 Type
   // Operations Type
@@ -64,6 +64,8 @@ Const
   CT_TOpRecoverFoundsData_NUL : TOpRecoverFoundsData = (account:0;n_operation:0;fee:0);
 
 Type
+
+  { TOpChangeKey }
   { TOpTransaction }
 
   TOpTransaction = Class(TPCOperation)
@@ -96,7 +98,6 @@ Type
     Function toString : String; Override;
   End;
 
-  { TOpChangeKey }
 
   TOpChangeKey = Class(TPCOperation)
   private
@@ -290,25 +291,10 @@ Type
     Function toString : String; Override;
   End;
 
-Procedure RegisterOperationsClass;
-
 implementation
 
 uses
-  SysUtils, UConst, ULog, UTxMultiOperation;
-
-Procedure RegisterOperationsClass;
-Begin
-  TPCOperationsComp.RegisterOperationClass(TOpTransaction);
-  TPCOperationsComp.RegisterOperationClass(TOpChangeKey);
-  TPCOperationsComp.RegisterOperationClass(TOpRecoverFounds);
-  TPCOperationsComp.RegisterOperationClass(TOpListAccountForSale);
-  TPCOperationsComp.RegisterOperationClass(TOpDelistAccountForSale);
-  TPCOperationsComp.RegisterOperationClass(TOpBuyAccount);
-  TPCOperationsComp.RegisterOperationClass(TOpChangeKeySigned);
-  TPCOperationsComp.RegisterOperationClass(TOpChangeAccountInfo);
-  TPCOperationsComp.RegisterOperationClass(TOpMultiOperation);
-End;
+  SysUtils, UConst, ULog, UTxMultiOperation, UStreamOp, UMultiOpChangeInfo, UAccount, UAccountComp, UPCSafeBox, UMultiOpSender, UMultiOpReceiver, UAccountState, UAccountInfo;
 
 { TOpChangeAccountInfo }
 
@@ -328,9 +314,9 @@ begin
   TStreamOp.WriteAnsiString(Stream,FData.payload);
   TStreamOp.WriteAccountKey(Stream,FData.public_key);
   b := 0;
-  if (public_key in FData.changes_type) then b:=b OR $01;
-  if (account_name in FData.changes_type) then b:=b OR $02;
-  if (account_type in FData.changes_type) then b:=b OR $04;
+  if (ait_public_key in FData.changes_type) then b:=b OR $01;
+  if (ait_account_name in FData.changes_type) then b:=b OR $02;
+  if (ait_account_type in FData.changes_type) then b:=b OR $04;
   Stream.Write(b,Sizeof(b));
   TStreamOp.WriteAccountKey(Stream,FData.new_accountkey);
   TStreamOp.WriteAnsiString(Stream,FData.new_name);
@@ -353,9 +339,9 @@ begin
   if TStreamOp.ReadAccountKey(Stream,FData.public_key)<0 then Exit;
   Stream.Read(b,SizeOf(b));
   FData.changes_type:=[];
-  if (b AND $01)=$01 then FData.changes_type:=FData.changes_type + [public_key];
-  if (b AND $02)=$02 then FData.changes_type:=FData.changes_type + [account_name];
-  if (b AND $04)=$04 then FData.changes_type:=FData.changes_type + [account_type];
+  if (b AND $01)=$01 then FData.changes_type:=FData.changes_type + [ait_public_key];
+  if (b AND $02)=$02 then FData.changes_type:=FData.changes_type + [ait_account_name];
+  if (b AND $04)=$04 then FData.changes_type:=FData.changes_type + [ait_account_type];
   // Check
   if (b AND $F8)<>0 then Exit;
   if TStreamOp.ReadAccountKey(Stream,FData.new_accountkey)<0 then Exit;
@@ -403,9 +389,9 @@ begin
     TStreamOp.WriteAnsiString(Stream,op.payload);
     TStreamOp.WriteAccountKey(Stream,op.public_key);
     b := 0;
-    if (public_key in op.changes_type) then b:=b OR $01;
-    if (account_name in op.changes_type) then b:=b OR $02;
-    if (account_type in op.changes_type) then b:=b OR $04;
+    if (ait_public_key in op.changes_type) then b:=b OR $01;
+    if (ait_account_name in op.changes_type) then b:=b OR $02;
+    if (ait_account_type in op.changes_type) then b:=b OR $04;
     Stream.Write(b,Sizeof(b));
     TStreamOp.WriteAccountKey(Stream,op.new_accountkey);
     TStreamOp.WriteAnsiString(Stream,op.new_name);
@@ -502,12 +488,12 @@ begin
     errors := 'NOT ALLOWED ON PROTOCOL 1';
     exit;
   end;
-  If (public_key in FData.changes_type) then begin
+  If (ait_public_key in FData.changes_type) then begin
     If Not TAccountComp.IsValidAccountKey( FData.new_accountkey, errors ) then begin
       exit;
     end;
   end;
-  If (account_name in FData.changes_type) then begin
+  If (ait_account_name in FData.changes_type) then begin
     If (FData.new_name<>'') then begin
       If Not TPCSafeBox.ValidAccountName(FData.new_name,errors) then Exit;
     end;
@@ -547,13 +533,13 @@ begin
   end else FHasValidSignature := true;
   FPrevious_Signer_updated_block := account_signer.updated_block;
   FPrevious_Destination_updated_block := account_target.updated_block;
-  If (public_key in FData.changes_type) then begin
+  If (ait_public_key in FData.changes_type) then begin
     account_target.accountInfo.accountKey := FData.new_accountkey;
   end;
-  If (account_name in FData.changes_type) then begin
+  If (ait_account_name in FData.changes_type) then begin
     account_target.name := FData.new_name;
   end;
-  If (account_type in FData.changes_type) then begin
+  If (ait_account_type in FData.changes_type) then begin
     account_target.account_type := FData.new_type;
   end;
   Result := AccountTransaction.UpdateAccountInfo(AccountPreviousUpdatedBlock,
@@ -622,15 +608,15 @@ begin
   // FData.public_key:=key.PublicKey;
   FData.changes_type:=[];
   If change_key then begin
-    FData.changes_type:=FData.changes_type + [public_key];
+    FData.changes_type:=FData.changes_type + [ait_public_key];
     FData.new_accountkey:=new_account_key;
   end;
   If change_name then begin
-    FData.changes_type:=FData.changes_type + [account_name];
+    FData.changes_type:=FData.changes_type + [ait_account_name];
     FData.new_name:=new_name;
   end;
   If change_type then begin
-    FData.changes_type:=FData.changes_type + [account_type];
+    FData.changes_type:=FData.changes_type + [ait_account_type];
     FData.new_type:=new_type;
   end;
   If Not DoSignOperation(key,FData) then begin
@@ -645,12 +631,12 @@ function TOpChangeAccountInfo.toString: String;
 var s : String;
 begin
   s := '';
-  If (public_key IN FData.changes_type) then s := 'new public key '+TAccountComp.GetECInfoTxt(FData.new_accountkey.EC_OpenSSL_NID);
-  If (account_name IN FData.changes_type)  then begin
+  If (ait_public_key IN FData.changes_type) then s := 'new public key '+TAccountComp.GetECInfoTxt(FData.new_accountkey.EC_OpenSSL_NID);
+  If (ait_account_name IN FData.changes_type)  then begin
     if s<>'' then s:=s+', ';
     s := s + 'new name to "'+FData.new_name+'"';
   end;
-  If (account_type IN FData.changes_type)  then begin
+  If (ait_account_type IN FData.changes_type)  then begin
     if s<>'' then s:=s+', ';
     s := s + 'new type to '+IntToStr(FData.new_type);
   end;
@@ -1009,7 +995,7 @@ begin
       SetLength(OperationResume.Changers,1);
       OperationResume.Changers[0] := CT_TMultiOpChangeInfo_NUL;
       OperationResume.Changers[0].Account := FData.target;
-      OperationResume.Changers[0].Changes_type := [public_key];
+      OperationResume.Changers[0].Changes_type := [ait_public_key];
       OperationResume.Changers[0].New_Accountkey := FData.new_accountkey;
     end;
   end;
@@ -1384,7 +1370,7 @@ begin
   SetLength(OperationResume.Changers,1);
   OperationResume.Changers[0] := CT_TMultiOpChangeInfo_NUL;
   OperationResume.Changers[0].Account := FData.account_target;
-  OperationResume.Changers[0].Changes_type := [public_key];
+  OperationResume.Changers[0].Changes_type := [ait_public_key];
   OperationResume.Changers[0].New_Accountkey := FData.new_accountkey;
   if (FData.account_signer=FData.account_target) then begin
     OperationResume.Changers[0].N_Operation := FData.n_operation;
@@ -1869,9 +1855,9 @@ begin
   case FData.operation_type of
     lat_ListForSale : begin
         if (FData.new_public_key.EC_OpenSSL_NID=CT_TECDSA_Public_Nul.EC_OpenSSL_NID) then begin
-          OperationResume.Changers[0].Changes_type:=[list_for_public_sale];
+          OperationResume.Changers[0].Changes_type:=[ait_list_for_public_sale];
         end else begin
-          OperationResume.Changers[0].Changes_type:=[list_for_private_sale];
+          OperationResume.Changers[0].Changes_type:=[ait_list_for_private_sale];
           OperationResume.Changers[0].New_Accountkey := FData.new_public_key;
           OperationResume.Changers[0].Locked_Until_Block := FData.locked_until_block;
         end;
@@ -2087,6 +2073,4 @@ begin
   Result := CT_Op_BuyAccount;
 end;
 
-initialization
-  RegisterOperationsClass;
 end.

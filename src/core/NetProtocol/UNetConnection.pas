@@ -3,7 +3,7 @@ unit UNetConnection;
 interface
 
 uses
-  Classes, UTCPIP, UOperationBlock, UTickCount, UThread, UAccountKey, UNetProtocolVersion, UOrderedRawList, UOperationsHashTree;
+  Classes, UTCPIP, UOperationBlock, UTickCount, UThread, UAccountKey, UNetProtocolVersion, UOrderedRawList, UOperationsHashTree, UNetHeaderData, UNetTransferType, UPCOperationsComp;
 
 type
   { TNetConnection }
@@ -84,6 +84,9 @@ type
   End;
 
 implementation
+
+uses
+  SysUtils, ULog, UNodeServerAddress, UConst, UNetData;
 
 { TNetConnection }
 

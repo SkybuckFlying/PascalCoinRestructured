@@ -3,7 +3,7 @@ unit UPCBank;
 interface
 
 uses
-  Classes, UStorage;
+  Classes, UStorage, UPCSafeBox, UPCOperationsComp, UOperationBlock, UPCBankLog, UThread, UStorageClass, UBlockAccount, ULog;
 
 type
   { TPCBank }
@@ -44,9 +44,15 @@ type
     Function IsReady(Var CurrentProcess : AnsiString) : Boolean;
     Property LastBlockFound : TPCOperationsComp read FLastBlockCache;
     Property UpgradingToV2 : Boolean read FUpgradingToV2;
+
+    // Skybuck: added property for NotifyList so TPCBankNotify can access it
+    property NotifyList : TList read FNotifyList;
   End;
 
 implementation
+
+uses
+  SysUtils, UCrypto, UPCBankNotify, UConst;
 
 { TPCBank }
 
@@ -333,7 +339,10 @@ begin
   if Not Assigned(FStorage) then begin
     if Not Assigned(FStorageClass) then raise Exception.Create('StorageClass not defined');
     FStorage := FStorageClass.Create(Self);
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     FStorage.Bank := Self;
+    {$ENDIF}
   end;
   Result := FStorage;
 end;

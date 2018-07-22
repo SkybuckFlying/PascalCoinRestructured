@@ -16,8 +16,13 @@ type
   end;
   TMultiOpSenders = Array of TMultiOpSender;
 
-
+var
+  CT_TMultiOpSender_NUL : TMultiOpSender;
 
 implementation
+
+initialization
+  Initialize(CT_TMultiOpSender_NUL);
+
 
 end.

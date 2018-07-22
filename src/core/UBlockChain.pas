@@ -20,7 +20,7 @@ unit UBlockChain;
 interface
 
 uses
-  Classes, UCrypto, UAccounts, ULog, UThread, SyncObjs, UOperationBlock, UOperationsHashTree;
+  Classes, UCrypto, UAccounts, ULog, UThread, SyncObjs, UOperationBlock, UOperationsHashTree, UOperationResume;
 {$I config.inc}
 
 {
@@ -106,13 +106,6 @@ uses
 }
 
 Type
-
-
-
-  TPCBank = Class;
-  TPCBankNotify = Class;
-  TPCOperation = Class;
-
   TOperationsResumeList = Class
   private
     FList : TPCThreadList;
@@ -131,31 +124,10 @@ Type
 
 
 
-  TPCBankLog = procedure(sender: TPCBank; Operations: TPCOperationsComp; Logtype: TLogType ; Logtxt: AnsiString) of object;
-
-  TPCBankNotify = Class(TComponent)
-  private
-    FOnNewBlock: TNotifyEvent;
-    FBank: TPCBank;
-    procedure SetBank(const Value: TPCBank);
-  protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); Override;
-    Procedure NotifyNewBlock;
-  public
-    Constructor Create(AOwner: TComponent); Override;
-    Destructor Destroy; Override;
-    Property Bank : TPCBank read FBank write SetBank;
-    Property OnNewBlock : TNotifyEvent read FOnNewBlock write FOnNewBlock;
-  End;
-
-  TStorageClass = Class of TStorage;
 
 
-var
-  CT_TMultiOpSender_NUL : TMultiOpSender;
-  CT_TMultiOpReceiver_NUL : TMultiOpReceiver;
-  CT_TMultiOpChangeInfo_NUL : TMultiOpChangeInfo;
-  CT_TOpChangeAccountInfoType_Txt : Array[Low(TOpChangeAccountInfoType)..High(TOpChangeAccountInfoType)] of AnsiString = ('public_key','account_name','account_type','list_for_public_sale','list_for_private_sale','delist');
+
+
 
 implementation
 
@@ -165,48 +137,6 @@ uses
   {Controls, Forms,}
   Dialogs, {StdCtrls,}
   UTime, UConst, UOpTransaction, UBaseTypes;
-
-
-{ TPCBankNotify }
-
-constructor TPCBankNotify.Create(AOwner: TComponent);
-begin
-  inherited;
-  FBank := Nil;
-end;
-
-destructor TPCBankNotify.Destroy;
-begin
-  Bank := Nil;
-  inherited;
-end;
-
-procedure TPCBankNotify.Notification(AComponent: TComponent;
-  Operation: TOperation);
-begin
-  inherited;
-  if (operation=opremove) then if AComponent=FBank then FBank:=nil;
-end;
-
-procedure TPCBankNotify.NotifyNewBlock;
-begin
-  if Assigned(FOnNewBlock) Then FOnNewBlock(Bank);
-end;
-
-procedure TPCBankNotify.SetBank(const Value: TPCBank);
-begin
-  if Assigned(FBank) then begin
-    FBank.FNotifyList.Remove(Self);
-    FBank.RemoveFreeNotification(Self);
-  end;
-  FBank := Value;
-  if Assigned(FBank) then begin
-    FBank.FreeNotification(Self);
-    FBank.FNotifyList.Add(Self);
-  end;
-end;
-
-
 
 { TOperationsResumeList }
 
@@ -288,18 +218,7 @@ end;
 
 initialization
 
-  Initialize(CT_TMultiOpSender_NUL);
-  Initialize(CT_TMultiOpReceiver_NUL);
-  Initialize(CT_TMultiOpChangeInfo_NUL);
 
-  with CT_TMultiOpChangeInfo_NUL do
-  begin
-    Seller_Account:=-1;
-    Account_Price:=-1;
-  end;
-
-  SetLength(_OperationsClass, 0);
-  RegisterOperationsClass;
 finalization
 
 end.

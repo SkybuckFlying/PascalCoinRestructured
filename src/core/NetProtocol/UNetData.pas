@@ -2,9 +2,10 @@ unit UNetData;
 
 interface
 
-type
-  TProcessReservedAreaMessage = procedure (netData : TNetData; senderConnection : TNetConnection; const HeaderData : TNetHeaderData; receivedData : TStream; responseData : TStream) of object;
+uses
+  Classes, UNetDataNotifyEventsThread;
 
+type
   TNetData = Class(TComponent)
   private
     FMaxNodeServersAddressesBuffer: Integer;

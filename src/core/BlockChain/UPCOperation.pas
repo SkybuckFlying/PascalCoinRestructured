@@ -76,7 +76,7 @@ type
 implementation
 
 uses
-  SysUtils, UCrypto, UBaseType, UConst, UOpTransaction;
+  SysUtils, UCrypto, UBaseType, UConst, UOpTransaction, UAccountComp, UOpChangeAccountInfoType;
 
 { TPCOperation }
 
@@ -417,14 +417,14 @@ begin
     CT_Op_ChangeAccountInfo : Begin
       OperationResume.DestAccount := Operation.DestinationAccount;
       s := '';
-      if (public_key in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
+      if (ait_public_key in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
         s := 'key';
       end;
-      if (account_name in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
+      if (ait_account_name in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
         if s<>'' then s:=s+',';
         s := s + 'name';
       end;
-      if (account_type in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
+      if (ait_account_type in TOpChangeAccountInfo(Operation).Data.changes_type) then begin
         if s<>'' then s:=s+',';
         s := s + 'type';
       end;

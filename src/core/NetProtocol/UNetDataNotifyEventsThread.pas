@@ -2,6 +2,9 @@ unit UNetDataNotifyEventsThread;
 
 interface
 
+uses
+  UThread, UNetData; // more circular references problems. "circular reference problem 2" going to commit changes so far.
+
 type
   { TNetDataNotifyEventsThread ensures that notifications of TNetData object
     will be in main Thread calling a Synchronized method }

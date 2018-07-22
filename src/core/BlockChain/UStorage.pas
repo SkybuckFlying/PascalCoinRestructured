@@ -6,15 +6,19 @@ uses
   Classes, UOrphan, UPCOperationsComp, UOperationsHashTree;
 
 type
-  TPCBank = Class;
-
   { TStorage }
   TStorage = Class(TComponent)
   private
     FOrphan: TOrphan;
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     FBank : TPCBank;
+    {$ENDIF}
+
     FReadOnly: Boolean;
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     procedure SetBank(const Value: TPCBank);
+    {$ENDIF}
   protected
     FIsMovingBlockchain : Boolean;
     procedure SetOrphan(const Value: TOrphan); virtual;
@@ -25,7 +29,6 @@ type
     Function DoSaveBank : Boolean; virtual; abstract;
     Function DoRestoreBank(max_block : Int64) : Boolean; virtual; abstract;
     Procedure DoDeleteBlockChainBlocks(StartingDeleteBlock : Cardinal); virtual; abstract;
-    Function BlockExists(Block : Cardinal) : Boolean; virtual; abstract;
     function GetFirstBlockNumber: Int64; virtual; abstract;
     function GetLastBlockNumber: Int64; virtual; abstract;
     function DoInitialize:Boolean; virtual; abstract;
@@ -34,6 +37,9 @@ type
     Procedure DoSavePendingBufferOperations(OperationsHashTree : TOperationsHashTree); virtual; abstract;
     Procedure DoLoadPendingBufferOperations(OperationsHashTree : TOperationsHashTree); virtual; abstract;
   public
+    // Skybuck: moved to here so TPCBank can access it
+    Function BlockExists(Block : Cardinal) : Boolean; virtual; abstract;
+
     Function LoadBlockChainBlock(Operations : TPCOperationsComp; Block : Cardinal) : Boolean;
     Function SaveBlockChainBlock(Operations : TPCOperationsComp) : Boolean;
     Function MoveBlockChainBlocks(StartBlock : Cardinal; Const DestOrphan : TOrphan; DestStorage : TStorage) : Boolean;
@@ -43,7 +49,9 @@ type
     Constructor Create(AOwner : TComponent); Override;
     Property Orphan : TOrphan read FOrphan write SetOrphan;
     Property ReadOnly : Boolean read FReadOnly write SetReadOnly;
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     Property Bank : TPCBank read FBank write SetBank;
+    {$ENDIF}
     Procedure CopyConfiguration(Const CopyFrom : TStorage); virtual;
     Property FirstBlock : Int64 read GetFirstBlockNumber;
     Property LastBlock : Int64 read GetLastBlockNumber;
@@ -57,6 +65,9 @@ type
   End;
 
 implementation
+
+uses
+  SysUtils, ULog;
 
 { TStorage }
 
@@ -128,6 +139,7 @@ function TStorage.SaveBank: Boolean;
 begin
   Result := true;
   If FIsMovingBlockchain then Exit;
+  {$IF DEFINED(CIRCULAR_REFERENCE)}
   if Not TPCSafeBox.MustSafeBoxBeSaved(Bank.BlocksCount) then exit; // No save
   Try
     Result := DoSaveBank;
@@ -138,6 +150,7 @@ begin
       Raise;
     end;
   End;
+  {$ENDIF}
 end;
 
 function TStorage.SaveBlockChainBlock(Operations: TPCOperationsComp): Boolean;
@@ -153,10 +166,12 @@ begin
   End;
 end;
 
+{$IF DEFINED(CIRCULAR_REFERENCE)}
 procedure TStorage.SetBank(const Value: TPCBank);
 begin
   FBank := Value;
 end;
+{$ENDIF}
 
 procedure TStorage.SetOrphan(const Value: TOrphan);
 begin

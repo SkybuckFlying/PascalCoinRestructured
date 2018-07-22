@@ -502,7 +502,7 @@ begin
   FSentOperations := TOrderedRawList.Create;
   FNodeLog := TLog.Create(Self);
   FNodeLog.ProcessGlobalLogs := false;
-  RegisterOperationsClass;
+//  RegisterOperationsClass; // Skybuck: should not be needed
   if Assigned(_Node) then raise Exception.Create('Duplicate nodes protection');
   TLog.NewLog(ltInfo,ClassName,'TNode.Create');
   inherited;

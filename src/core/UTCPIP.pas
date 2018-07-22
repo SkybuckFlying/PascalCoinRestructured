@@ -199,7 +199,7 @@ uses
 {$ELSE}
   {LCLIntf, LCLType, LMessages,}
 {$ENDIF}
-  UConst, ULog;
+  UConst, ULog, UPlatform;
 
 { TNetTcpIpClient }
 

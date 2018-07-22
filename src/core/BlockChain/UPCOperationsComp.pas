@@ -6,12 +6,12 @@ uses
   Classes, UPCSafeBoxTransaction, UOperationBlock, UOperationsHashTree, URawBytes, UThread, UAccountPreviousBlockInfo, UPCOperation, UAccountKey, UOperationResume, UPCOperationClass;
 
 type
-  TPCBank = Class;
-
   { TPCOperationsComp }
   TPCOperationsComp = Class(TComponent)
   private
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     FBank: TPCBank;
+    {$ENDIF}
     FSafeBoxTransaction : TPCSafeBoxTransaction;
     FOperationBlock: TOperationBlock;
     FOperationsHashTree : TOperationsHashTree;
@@ -24,7 +24,9 @@ type
     FOperationsLock : TPCCriticalSection;
     FPreviousUpdatedBlocks : TAccountPreviousBlockInfo; // New Protocol V3 struct to store previous updated blocks
     function GetOperation(index: Integer): TPCOperation;
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     procedure SetBank(const value: TPCBank);
+    {$ENDIF}
     procedure SetnOnce(const value: Cardinal);
     procedure Settimestamp(const value: Cardinal);
     function GetnOnce: Cardinal;
@@ -49,7 +51,9 @@ type
     Function AddOperation(Execute : Boolean; op: TPCOperation; var errors: AnsiString): Boolean;
     Function AddOperations(operations: TOperationsHashTree; var errors: AnsiString): Integer;
     Property Operation[index: Integer]: TPCOperation read GetOperation;
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     Property bank: TPCBank read FBank write SetBank;
+    {$ENDIF}
     Procedure Clear(DeleteOperations : Boolean);
     Function Count: Integer;
     Property OperationBlock: TOperationBlock read FOperationBlock;
@@ -99,12 +103,9 @@ type
 implementation
 
 uses
-  UPCBank;
+  UPCBank, SysUtils, UCrypto, UPascalCoinProtocol, UTime, UConst, UAccountComp, UStreamOp, ULog, UBaseType;
 
 { TPCOperationsComp }
-
-var
-  _OperationsClass: Array of TPCOperationClass;
 
 function TPCOperationsComp.AddOperation(Execute: Boolean; op: TPCOperation; var errors: AnsiString): Boolean;
 Begin
@@ -113,6 +114,7 @@ Begin
     errors := '';
     Result := False;
     if Execute then begin
+      {$IF DEFINED(CIRCULAR_REFERENCE)}
       if (FBank = Nil) then begin
         errors := 'No Bank';
         exit;
@@ -121,6 +123,7 @@ Begin
         errors := 'Bank blockcount<>OperationBlock.Block';
         exit;
       end;
+      {$ENDIF}
       // Only process when in current address, prevent do it when reading operations from file
       Result := op.DoOperation(FPreviousUpdatedBlocks, FSafeBoxTransaction, errors);
     end else Result := true;
@@ -204,6 +207,8 @@ begin
     // This function does not initializes "account_key" nor "block_payload" fields
 
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     if Assigned(FBank) then begin
       FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
       If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
@@ -224,6 +229,8 @@ begin
       FOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash); // Nothing for first line
       FOperationBlock.protocol_version := CT_PROTOCOL_1;
     end;
+    {$ENDIF}
+
     FOperationBlock.operations_hash := FOperationsHashTree.HashTree;
     FOperationBlock.fee := 0;
     FOperationBlock.nonce := 0;
@@ -270,7 +277,11 @@ begin
     lastopb := FOperationBlock;
     FOperationBlock := Operations.FOperationBlock;
     FOperationBlock.account_key := lastopb.account_key; // Except AddressKey
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     FOperationBlock.compact_target := FBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+    {$ENDIF}
+
     FIsOnlyOperationBlock := Operations.FIsOnlyOperationBlock;
     FOperationsHashTree.CopyFromHashTree(Operations.FOperationsHashTree);
     FOperationBlock.operations_hash := FOperationsHashTree.HashTree;
@@ -299,13 +310,20 @@ begin
   FStreamPoW.Position := 0;
   FOperationsHashTree := TOperationsHashTree.Create;
   FOperationsHashTree.OnChanged:= OnOperationsHashTreeChanged;
+
+  {$IF DEFINED(CIRCULAR_REFERENCE)}
   FBank := Nil;
+  {$ENDIF}
+
   FOperationBlock := GetFirstBlock;
   FSafeBoxTransaction := Nil;
   FPreviousUpdatedBlocks := TAccountPreviousBlockInfo.Create;
+
+  {$IF DEFINED(CIRCULAR_REFERENCE)}
   if Assigned(AOwner) And (AOwner is TPCBank) then begin
     SetBank( TPCBank(AOwner) );
   end else Clear(true);
+  {$ENDIF}
 end;
 
 destructor TPCOperationsComp.Destroy;
@@ -521,10 +539,13 @@ procedure TPCOperationsComp.Notification(AComponent: TComponent;
 begin
   inherited;
   if (Operation = opRemove) then begin
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     if AComponent = FBank then begin
       FBank := Nil;
       FreeAndNil(FSafeBoxTransaction);
     end;
+    {$ENDIF}
   end;
 end;
 
@@ -561,6 +582,8 @@ begin
   Lock;
   Try
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     if Assigned(FBank) then begin
       FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
       If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
@@ -583,6 +606,8 @@ begin
       FOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash);
       FOperationBlock.protocol_version := CT_PROTOCOL_1;
     end;
+    {$ENDIF}
+
     FOperationBlock.proof_of_work := '';
     FOperationBlock.protocol_available := CT_BlockChain_Protocol_Available;
     n := 0;
@@ -744,6 +769,7 @@ begin
   end;
 end;
 
+{$IF DEFINED(CIRCULAR_REFERENCE)}
 procedure TPCOperationsComp.SetBank(const value: TPCBank);
 begin
   if FBank = value then exit;
@@ -757,6 +783,7 @@ begin
   end;
   Clear(true);
 end;
+{$ENDIF}
 
 procedure TPCOperationsComp.SetBlockPayload(const Value: TRawBytes);
 begin
@@ -785,9 +812,12 @@ begin
   Lock;
   Try
     ts := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
+
+    {$IF DEFINED(CIRCULAR_REFERENCE)}
     if Assigned(FBank) then begin
       If FBank.FLastOperationBlock.timestamp>ts then ts := FBank.FLastOperationBlock.timestamp;
     end;
+    {$ENDIF}
     timestamp := ts;
   finally
     Unlock;
