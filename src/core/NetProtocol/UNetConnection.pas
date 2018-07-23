@@ -16,7 +16,6 @@ type
     FLastDataReceivedTS : TTickCount;
     FLastDataSendedTS : TTickCount;
     FClientBufferRead : TStream;
-    FNetLock : TPCCriticalSection;
     FIsWaitingForResponse : Boolean;
     FTimestampDiff : Integer;
     FIsMyselfServer : Boolean;
@@ -38,7 +37,6 @@ type
     procedure TcpClient_OnConnect(Sender: TObject);
     procedure TcpClient_OnDisconnect(Sender: TObject);
     Function DoSendAndWaitForResponse(operation: Word; RequestId: Integer; SendDataBuffer, ReceiveDataBuffer: TStream; MaxWaitTime : Cardinal; var HeaderData : TNetHeaderData) : Boolean;
-    procedure DoProcessBuffer;
     Procedure DoProcess_Hello(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_Message(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_GetBlocks_Request(HeaderData : TNetHeaderData; DataBuffer: TStream);
@@ -50,17 +48,23 @@ type
     Procedure DoProcess_GetPendingOperations_Request(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_GetAccount_Request(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_GetPendingOperations;
-    Procedure SetClient(Const Value : TNetTcpIpClient);
     Function ReadTcpClientBuffer(MaxWaitMiliseconds : Cardinal; var HeaderData : TNetHeaderData; BufferData : TStream) : Boolean;
     Procedure DisconnectInvalidClient(ItsMyself : Boolean; Const why : AnsiString);
     function GetClient: TNetTcpIpClient;
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     Procedure Send(NetTranferType : TNetTransferType; operation, errorcode : Word; request_id : Integer; DataBuffer : TStream);
-    Procedure SendError(NetTranferType : TNetTransferType; operation, request_id : Integer; error_code : Integer; error_text : AnsiString);
   public
+    FNetLock : TPCCriticalSection;
+
     Constructor Create(AOwner : TComponent); override;
     Destructor Destroy; override;
+
+    // Skybuck: moved to here to offer access to UNetServer
+    procedure DoProcessBuffer;
+    Procedure SetClient(Const Value : TNetTcpIpClient);
+    Procedure SendError(NetTranferType : TNetTransferType; operation, request_id : Integer; error_code : Integer; error_text : AnsiString);
+
     Function ConnectTo(ServerIP: String; ServerPort:Word) : Boolean;
     Property Connected : Boolean read GetConnected write SetConnected;
     Property IsConnecting : Boolean read FIsConnecting;
@@ -80,7 +84,14 @@ type
     Property IsMyselfServer : Boolean read FIsMyselfServer;
     Property CreatedTime : TDateTime read FCreatedTime;
     Property ClientAppVersion : AnsiString read FClientAppVersion write FClientAppVersion;
+
+    // Skybuck: added to offer access for NetData
+    Property DoFinalizeConnection : boolean read FDoFinalizeConnection;
+//    Property NetLock : TPCCriticalSection read FNetLock;
+
     Procedure FinalizeConnection;
+
+
   End;
 
 implementation

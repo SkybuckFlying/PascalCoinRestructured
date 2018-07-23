@@ -2,6 +2,9 @@ unit UNetworkAdjustedTime;
 
 interface
 
+uses
+  UThread, Classes;
+
 type
   TNetworkAdjustedTime = Class
   private
@@ -22,6 +25,9 @@ type
   end;
 
 implementation
+
+uses
+  UTime, SysUtils, ULog, UConst;
 
 { TNetworkAdjustedTime }
 

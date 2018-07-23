@@ -70,8 +70,6 @@ uses
   UNetServer in 'core\NetProtocol\UNetServer.pas',
   UNetClient in 'core\NetProtocol\UNetClient.pas',
   UThreadGetNewBlockChainFromClient in 'core\NetProtocol\UThreadGetNewBlockChainFromClient.pas',
-  UNetDataNotifyEventsThread in 'core\NetProtocol\UNetDataNotifyEventsThread.pas',
-  UNetClientsDestroyThread in 'core\NetProtocol\UNetClientsDestroyThread.pas',
   UThreadDiscoverConnection in 'core\NetProtocol\UThreadDiscoverConnection.pas',
   UNetClientThread in 'core\NetProtocol\UNetClientThread.pas',
   UNetServerClient in 'core\NetProtocol\UNetServerClient.pas',

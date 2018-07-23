@@ -3,16 +3,28 @@ unit UNetData;
 interface
 
 uses
-  Classes, UNetDataNotifyEventsThread, UECPrivateKey, UThread, UOrderedServerAddressListTS, UNetStatistics, UProcessReservedAreaMessage, UNotifyEventToMany,
-  UOperationBlock, UNodeServerAddress, UNetClientsDestroyThread;
+  Classes, UECPrivateKey, UThread, UOrderedServerAddressListTS, UNetStatistics, UProcessReservedAreaMessage, UNotifyEventToMany,
+  UOperationBlock, UNodeServerAddress, UNetWorkAdjustedTime, UNetConnection, UNetHeaderData, UPCBank;
 
 type
   TNetData = Class(TComponent)
   private
+    FNotifyOnReceivedHelloMessage : Boolean;
+    FNotifyOnStatisticsChanged : Boolean;
+    FNotifyOnNetConnectionsUpdated : Boolean;
+    FNotifyOnNodeServersUpdated : Boolean;
+    FNotifyOnBlackListUpdated : Boolean;
+
+    FOnReceivedHelloMessage: TNotifyEvent;
+    FOnStatisticsChanged: TNotifyEvent;
+    FOnNetConnectionsUpdated: TNotifyEvent;
+    FOnNodeServersUpdated: TNotifyEvent;
+    FOnBlackListUpdated: TNotifyEvent;
+
     FMaxNodeServersAddressesBuffer: Integer;
     FMaxServersConnected: Integer;
     FMinServersConnected: Integer;
-    FNetDataNotifyEventsThread : TNetDataNotifyEventsThread;
+    FNetDataNotifyEventsThread : TPCCustomThread;
     FNodePrivateKey : TECPrivateKey;
     FNetConnections : TPCThreadList;
     FNodeServersAddresses : TOrderedServerAddressListTS;
@@ -22,15 +34,14 @@ type
     FIsDiscoveringServers : Boolean;
     FIsGettingNewBlockChainFromClient : Boolean;
     FOnConnectivityChanged : TNotifyEventToMany;
-    FThreadCheckConnections : TPCThread;
+    FThreadCheckConnections : TPCCustomThread;
     FNetStatistics: TNetStatistics;
     FMaxRemoteOperationBlock : TOperationBlock;
     FFixedServers : TNodeServerAddressArray;
-    FNetClientsDestroyThread : TNetClientsDestroyThread;
+    FNetClientsDestroyThread : TPCCustomThread;
     FNetConnectionsActive: Boolean;
     FMaxConnections : Integer;
     FNetworkAdjustedTime : TNetworkAdjustedTime;
-    Procedure IncStatistics(incActiveConnections,incClientsConnections,incServersConnections,incServersConnectionsWithResponse : Integer; incBytesReceived, incBytesSend : Int64);
     procedure SetMaxNodeServersAddressesBuffer(AValue: Integer);
     procedure SetMaxServersConnected(AValue: Integer);
     procedure SetMinServersConnected(AValue: Integer);
@@ -40,6 +51,9 @@ type
   protected
     procedure DoProcessReservedAreaMessage(senderConnection : TNetConnection; const headerData : TNetHeaderData; receivedData : TStream; responseData : TStream); virtual;
   public
+    // Skybuck: moved to here to offer access to UNetServer
+    Procedure IncStatistics(incActiveConnections,incClientsConnections,incServersConnections,incServersConnectionsWithResponse : Integer; incBytesReceived, incBytesSend : Int64);
+
     Class function HeaderDataToText(const HeaderData : TNetHeaderData) : AnsiString;
     Class function ExtractHeaderInfo(buffer : TStream; var HeaderData : TNetHeaderData; DataBuffer : TStream; var IsValidHeaderButNeedMoreData : Boolean) : Boolean;
     Class Function OperationToText(operation : Word) : AnsiString;
@@ -79,7 +93,7 @@ type
     Property IsGettingNewBlockChainFromClient : Boolean read FIsGettingNewBlockChainFromClient;
     Property MaxRemoteOperationBlock : TOperationBlock read FMaxRemoteOperationBlock;
     Property NodePrivateKey : TECPrivateKey read FNodePrivateKey;
-    property OnConnectivityChanged : TNotifyEventToMany read FNetDataNotifyEventsThread.FOnConnectivityChanged;
+    property OnConnectivityChanged : TNotifyEventToMany read FOnConnectivityChanged;
     Property OnNetConnectionsUpdated : TNotifyEvent read FOnNetConnectionsUpdated write FOnNetConnectionsUpdated;
     Property OnNodeServersUpdated : TNotifyEvent read FOnNodeServersUpdated write FOnNodeServersUpdated;
     Property OnBlackListUpdated : TNotifyEvent read FOnBlackListUpdated write FOnBlackListUpdated;
@@ -97,9 +111,15 @@ type
     Property OnProcessReservedAreaMessage : TProcessReservedAreaMessage read FOnProcessReservedAreaMessage write FOnProcessReservedAreaMessage; // Skybuck: never used ? New feature or left over ?
     Property MinServersConnected : Integer read FMinServersConnected write SetMinServersConnected;
     Property MaxServersConnected : Integer read FMaxServersConnected write SetMaxServersConnected;
+
+    // Skybuck: property added to offer access to UNetServer
+    property MaxConnections : Integer read FMaxConnections write FMaxConnections;
   End;
 
 implementation
+
+uses
+  UNetRequestRegistered, SysUtils, UConst, UTime, UNetProtocolConst, UNode, UNetClient;
 
 Var _NetData : TNetData = nil; // Skybuck: another potential global var, investigate later.
 
@@ -204,7 +224,7 @@ begin
   try
     for i := 0 to l.Count - 1 do begin
       if (TObject(l[i])=ObjectPointer) then begin
-        if (Not (TNetConnection(l[i]).FDoFinalizeConnection)) And (TNetConnection(l[i]).Connected) then begin
+        if (Not (TNetConnection(l[i]).DoFinalizeConnection)) And (TNetConnection(l[i]).Connected) then begin
           nc := TNetConnection(l[i]);
           exit;
         end else exit;
@@ -213,7 +233,7 @@ begin
   finally
     FNetConnections.UnlockList;
     if Assigned(nc) then begin
-      Result := TPCThread.TryProtectEnterCriticalSection(Sender,MaxWaitMiliseconds,nc.FNetLock);
+      Result := TPCThread.TryProtectEnterCriticalSection(Sender,MaxWaitMiliseconds,nc.FNetLock); // Skybuck: property problem, will move var to public for now.
     end;
   end;
 end;
@@ -305,6 +325,13 @@ end;
 constructor TNetData.Create(AOwner: TComponent);
 begin
   inherited Create(AOwner);
+
+  FNotifyOnReceivedHelloMessage := false;
+  FNotifyOnStatisticsChanged := false;
+  FNotifyOnNetConnectionsUpdated := false;
+  FNotifyOnNodeServersUpdated := false;
+  FNotifyOnBlackListUpdated := false;
+
   FOnProcessReservedAreaMessage:=Nil;
   TLog.NewLog(ltInfo,ClassName,'TNetData.Create');
   FMaxConnections := CT_MaxClientsConnected;
@@ -1357,7 +1384,7 @@ Var l : TList;
   LastCheckTS : TTickCount;
 begin
   LastCheckTS := TPlatform.GetTickCount;
-  while (Not Sender.Terminated) do begin
+  while (Not CheckConnectionsThreaded.Terminated) do begin
     if ((TPlatform.GetTickCount>(FLastCheckTS+1000)) AND (Not FNetData.FIsDiscoveringServers)) then begin
       nactive := 0;
       ndeleted := 0;
@@ -1421,7 +1448,102 @@ begin
   end;
 end;
 
+procedure TNetClientsDestroyThread.TerminateAllConnectionsThreaded;
+Var l,l_to_del : TList;
+  i : Integer;
+begin
+  FTerminatedAllConnections := true;
+  l_to_del := TList.Create;
+  Try
+    while not TNetClientsDestroyThread.Terminated do begin
+      l_to_del.Clear;
+      l := FNetData.NetConnections.LockList;
+      try
+        FTerminatedAllConnections := l.Count=0;
+        for i := 0 to l.Count-1 do begin
+          If (TObject(l[i]) is TNetClient) And (not TNetConnection(l[i]).Connected)
+            And (TNetConnection(l[i]).FDoFinalizeConnection)
+            And (Not TNetConnection(l[i]).IsConnecting) then begin
+            l_to_del.Add(l[i]);
+          end;
+        end;
+      finally
+        FNetData.NetConnections.UnlockList;
+      end;
+      sleep(500); // Delay - Sleep time before destroying (1.5.3)
+      if l_to_del.Count>0 then begin
+        TLog.NewLog(ltDebug,ClassName,'Destroying NetClients: '+inttostr(l_to_del.Count));
+        for i := 0 to l_to_del.Count - 1 do begin
+          Try
+            DebugStep := 'Destroying NetClient '+TNetConnection(l_to_del[i]).ClientRemoteAddr;
+            TNetConnection(l_to_del[i]).Free;
+          Except
+            On E:Exception do begin
+              TLog.NewLog(ltError,ClassName,'Exception destroying TNetConnection '+IntToHex(PtrInt(l_to_del[i]),8)+': ('+E.ClassName+') '+E.Message );
+            end;
+          End;
+        end;
+      end;
+      Sleep(100);
+    end;
+  Finally
+    l_to_del.Free;
+  end;
+end;
 
+procedure TNetClientsDestroyThread.WaitForTerminatedAllConnections;
+begin
+  while (Not TNetClientsDestroyThread.FTerminatedAllConnections) do begin
+    TLog.NewLog(ltdebug,ClassName,'Waiting all connections terminated');
+    Sleep(100);
+  end;
+end;
+
+{ TNetDataNotifyEventsThread }
+
+{ TNetDataNotifyEventsThread ensures that notifications of TNetData object
+  will be in main Thread calling a Synchronized method }
+
+procedure TNetData.NotifyEventsThreaded;
+begin
+  while (not TNotifyEventsThread.Terminated) do begin
+    if (FNotifyOnReceivedHelloMessage) Or
+       (FNotifyOnStatisticsChanged) Or
+       (FNotifyOnNetConnectionsUpdated) Or
+       (FNotifyOnNodeServersUpdated) Or
+       (FNotifyOnBlackListUpdated) then begin
+      Synchronize(SynchronizedNotify);
+    end;
+    Sleep(10);
+  end;
+end;
+
+procedure TNetData.SynchronizedNotify;
+begin
+  if TNotifyEventsThread.Terminated then exit;
+
+  // nil/sender used to be FNetData, probably not thread-safe to pass that anyway ;)
+  if FNotifyOnReceivedHelloMessage then begin
+    FNotifyOnReceivedHelloMessage := false;
+    If Assigned(FOnReceivedHelloMessage) then FOnReceivedHelloMessage(nil);
+  end;
+  if FNotifyOnStatisticsChanged then begin
+    FNotifyOnStatisticsChanged := false;
+    If Assigned(FOnStatisticsChanged) then FOnStatisticsChanged(nil);
+  end;
+  if FNotifyOnNetConnectionsUpdated then begin
+    FNotifyOnNetConnectionsUpdated := false;
+    If Assigned(FOnNetConnectionsUpdated) then FOnNetConnectionsUpdated(nil);
+  end;
+  if FNotifyOnNodeServersUpdated then begin
+    FNotifyOnNodeServersUpdated := false;
+    If Assigned(FOnNodeServersUpdated) then FOnNodeServersUpdated(nil);
+  end;
+  if FNotifyOnBlackListUpdated then begin
+    FNotifyOnBlackListUpdated := false;
+    If Assigned(FOnBlackListUpdated) then FOnBlackListUpdated(nil);
+  end;
+end;
 
 initialization
   _NetData := Nil;

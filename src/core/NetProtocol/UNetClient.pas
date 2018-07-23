@@ -2,6 +2,9 @@ unit UNetClient;
 
 interface
 
+uses
+  UNetConnection, UNetClientThread;
+
 type
   TNetClient = Class(TNetConnection)
   private

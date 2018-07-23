@@ -466,8 +466,8 @@ end;
 
 constructor TPCCustomThread.Create(ParaThreadMethod: TThreadMethod);
 begin
-  inherited Create(False);
   FThreadMethod := ParaThreadMethod;
+  inherited Create(False);
   {$IFDEF HIGHLOG}TLog.NewLog(ltdebug,Classname,'Created Thread '+IntToHex(PtrInt(Self),8));{$ENDIF}
 end;
 

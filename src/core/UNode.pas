@@ -30,7 +30,8 @@ unit UNode;
 interface
 
 uses
-  Classes, UBlockChain, UNetProtocol, UAccounts, UCrypto, UThread, SyncObjs, ULog, UNetServer;
+  Classes, UBlockChain, UNetProtocol, UAccounts, UCrypto, UThread, SyncObjs, ULog, UNetServer, UPCBank, UPCOperationsComp, UPCBankNotify, UOrderedRawList, UNodeServerAddress,
+  UNetConnection, UBlockAccount, UOperationsHashTree, UPCOperation, UOperationResume, UOrderedAccountKeysList;
 
 {$I config.inc}
 
@@ -165,7 +166,7 @@ Type
 
 implementation
 
-Uses UOpTransaction, SysUtils,  UConst, UTime;
+Uses UOpTransaction, SysUtils,  UConst, UTime, UOperationBlock, UPtrInt, UNetData, UAccountComp, UPascalCoinProtocol, UAccount;
 
 var _Node : TNode;
 
@@ -515,7 +516,10 @@ begin
   FBCBankNotify.OnNewBlock := OnBankNewBlock;
   FNetServer := TNetServer.Create;
   FOperations := TPCOperationsComp.Create(Self);
+  {$IF DEFINED(CIRCULAR_REFERENCE)}
   FOperations.bank := FBank;
+  {$ENDIF}
+
   FNotifyList := TList.Create;
   {$IFDEF BufferOfFutureOperations}
   FBufferAuxWaitingOperations := TOperationsHashTree.Create;

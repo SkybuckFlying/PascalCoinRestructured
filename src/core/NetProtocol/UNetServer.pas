@@ -20,7 +20,7 @@ type
 implementation
 
 uses
-  UNetServerClient;
+  UNetServerClient, UTickCount, ULog, UNetData, UNetTransferType, UNetProtocolConst, Windows, SysUtils, UPtrInt, UPlatform;
 
 { TNetServer }
 
@@ -53,7 +53,7 @@ begin
       if (TNetData.NetData.NodeServersAddresses.IsBlackListed(Client.RemoteHost)) then begin
         // Invalid!
         TLog.NewLog(ltinfo,Classname,'Refusing Blacklist ip: '+Client.ClientRemoteAddr);
-        n.SendError(ntp_autosend,CT_NetOp_Error, 0,CT_NetError_IPBlackListed,'Your IP is blacklisted:'+Client.ClientRemoteAddr);
+        n.SendError(TNetTransferType.ntp_autosend,CT_NetOp_Error, 0,CT_NetError_IPBlackListed,'Your IP is blacklisted:'+Client.ClientRemoteAddr);
         // Wait some time before close connection
         sleep(5000);
       end else begin
@@ -106,7 +106,7 @@ end;
 procedure TNetServer.SetMaxConnections(AValue: Integer);
 begin
   inherited SetMaxConnections(AValue);
-  TNetData.NetData.FMaxConnections:=AValue;
+  TNetData.NetData.MaxConnections:=AValue;
 end;
 
 

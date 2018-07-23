@@ -2,6 +2,9 @@ unit UNetClientThread;
 
 interface
 
+uses
+  UThread, UNetClient;  // problem, circular unit reference 7, performing git commit.
+
 type
   TNetClientThread = Class(TPCThread)
   private
