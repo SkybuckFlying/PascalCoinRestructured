@@ -93,7 +93,7 @@ type
     Property NetConnectionsActive : Boolean read FNetConnectionsActive write SetNetConnectionsActive;
     Property NetworkAdjustedTime : TNetworkAdjustedTime read FNetworkAdjustedTime;
     Property MaxNodeServersAddressesBuffer : Integer read FMaxNodeServersAddressesBuffer write SetMaxNodeServersAddressesBuffer;
-    Property OnProcessReservedAreaMessage : TProcessReservedAreaMessage read FOnProcessReservedAreaMessage write FOnProcessReservedAreaMessage;
+    Property OnProcessReservedAreaMessage : TProcessReservedAreaMessage read FOnProcessReservedAreaMessage write FOnProcessReservedAreaMessage; // Skybuck: never used ? New feature or left over ?
     Property MinServersConnected : Integer read FMinServersConnected write SetMinServersConnected;
     Property MaxServersConnected : Integer read FMaxServersConnected write SetMaxServersConnected;
   End;
