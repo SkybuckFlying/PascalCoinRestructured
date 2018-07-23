@@ -136,7 +136,7 @@ uses
   SysUtils, Variants, {Graphics,}
   {Controls, Forms,}
   Dialogs, {StdCtrls,}
-  UTime, UConst, UOpTransaction, UBaseTypes;
+  UTime, UConst, UOpTransaction;
 
 { TOperationsResumeList }
 

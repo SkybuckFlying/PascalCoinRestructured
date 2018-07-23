@@ -19,7 +19,7 @@ unit USettings;
 interface
 
 uses
-  UAppParams, UBaseTypes;
+  UAppParams, UNotifyEventToMany;
 
 const
   // App Params

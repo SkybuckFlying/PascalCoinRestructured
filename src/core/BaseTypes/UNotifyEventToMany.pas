@@ -1,34 +1,12 @@
-unit UBaseTypes;
-
-{$IFDEF FPC}
-  {$MODE Delphi}
-{$ENDIF}
-
-{ Copyright (c) 2017 by Albert Molina
-
-  Distributed under the MIT software license, see the accompanying file LICENSE
-  or visit http://www.opensource.org/licenses/mit-license.php.
-
-  This unit is a part of Pascal Coin, a P2P crypto currency without need of
-  historical operations.
-
-  If you like it, consider a donation using BitCoin:
-  16K3HCZRhFUtM8GdWRcfKeaa6KsuyxZaYk
-
-  }
+unit UNotifyEventToMany;
 
 interface
 
 uses
-  Classes, SysUtils, URawBytes, UTickCount, UDynRawBytes, U32Bytes;
+  Classes;
 
-Type
-
-
-
-
-
-
+// Skybuck: could be moved to Lists folder, seems more like a list to me ;)
+type
   TNotifyEventToMany = Class
   private
     FList : Array of TNotifyEvent;
@@ -42,8 +20,10 @@ Type
     Constructor Create;
   End;
 
-
 implementation
+
+uses
+  SysUtils;
 
 { TNotifyEventToMany }
 
@@ -110,4 +90,3 @@ begin
 end;
 
 end.
-

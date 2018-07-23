@@ -35,7 +35,7 @@ uses
   {$IFDEF DelphiSockets}
   Sockets,
   {$ENDIF}
-  Classes, Sysutils, UBaseTypes,
+  Classes, Sysutils,
   UThread, SyncObjs, UTickCount;
 
 type

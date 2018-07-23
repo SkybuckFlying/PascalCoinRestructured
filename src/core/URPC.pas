@@ -21,7 +21,7 @@ interface
 
 Uses UThread, ULog, UConst, UNode, UAccounts, UCrypto, UBlockChain,
   UNetProtocol, UOpTransaction, UWallet, UTime, UAES, UECIES, UTxMultiOperation,
-  UJSONFunctions, classes, blcksock, synsock, IniFiles, Variants, math, UBaseTypes, UOpenSSL;
+  UJSONFunctions, classes, blcksock, synsock, IniFiles, Variants, math, UOpenSSL;
 
 Const
   CT_RPC_ErrNum_InternalError = 100;

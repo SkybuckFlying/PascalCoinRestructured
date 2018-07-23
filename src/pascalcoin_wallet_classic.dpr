@@ -39,7 +39,6 @@ uses
   UPoolMining in 'core\UPoolMining.pas',
   UOpenSSL in 'core\UOpenSSL.pas',
   UOpenSSLdef in 'core\UOpenSSLdef.pas',
-  UBaseTypes in 'core\UBaseTypes.pas',
   UAccountKeyStorage in 'core\UAccountKeyStorage.pas',
   UTxMultiOperation in 'core\UTxMultiOperation.pas',
   USettings in 'core\USettings.pas',
@@ -138,7 +137,8 @@ uses
   UProcessReservedAreaMessage in 'core\NetProtocol\UProcessReservedAreaMessage.pas',
   UECPrivateKey in 'core\Crypto\UECPrivateKey.pas',
   UECDSA_Public in 'core\Crypto\UECDSA_Public.pas',
-  UCryptoException in 'core\Crypto\UCryptoException.pas';
+  UCryptoException in 'core\Crypto\UCryptoException.pas',
+  UNotifyEventToMany in 'core\BaseTypes\UNotifyEventToMany.pas';
 
 {$R *.res}
 

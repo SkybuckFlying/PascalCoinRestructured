@@ -164,7 +164,7 @@ var
 
 implementation
 
-Uses ULog, Variants, UTime, UNetProtocol, UBaseTypes;
+Uses ULog, Variants, UTime, UNetProtocol;
 
 Type TPendingResponseMessage = Record
        sendDateTime : TDateTime;

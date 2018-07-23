@@ -2,6 +2,9 @@ unit UThreadCheckConnections;
 
 interface
 
+uses
+  UThread, UNetData;  // circular unit reference 5, making git commit.
+
 type
   TThreadCheckConnections = Class(TPCThread)
   private

@@ -28,7 +28,7 @@ uses
     LCLIntf, LCLType, LMessages, FileUtil,
   {$ENDIF}
   Classes, SysUtils,  Forms, Controls, Graphics, Dialogs, StdCtrls,
-  ExtCtrls, Menus, ActnList, UAccounts, UBlockChain, UNode, UCrypto, UBaseTypes,
+  ExtCtrls, Menus, ActnList, UAccounts, UBlockChain, UNode, UCrypto,
   UWallet, UConst, UTxMultiOperation, UOpTransaction;
 
 type
