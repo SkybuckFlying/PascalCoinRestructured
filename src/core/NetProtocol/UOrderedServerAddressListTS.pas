@@ -2,8 +2,11 @@ unit UOrderedServerAddressListTS;
 
 interface
 
+//uses
+//  UNetData; // third circular unit references, saving to git.
+
 uses
-  UNetData; // third circular unit references, saving to git.
+  UThread, Classes, UNetConnection, UNodeServerAddress, UNetStatistics;
 
 type
   // This will maintain a list sorted by 2 values: ip/port and netConnection in thread safe mode
@@ -13,7 +16,7 @@ type
   TOrderedServerAddressListTS = Class
   private
     FAllowDeleteOnClean: Boolean;
-    FNetData : TNetData;
+    FNetStatistics : PNetStatistics;
     FCritical : TPCCriticalSection;
     FListByIp : TList;
     FListByNetConnection : TList;
@@ -23,7 +26,7 @@ type
   protected
     function DeleteNetConnection(netConnection : TNetConnection) : Boolean;
   public
-    Constructor Create(ANetData : TNetData);
+    Constructor Create( ParaNetStatistics : PNetStatistics);
     Destructor Destroy; Override;
     Procedure Clear;
     Function Count : Integer;
@@ -41,6 +44,9 @@ type
   End;
 
 implementation
+
+uses
+  UNetProtocolConst, UTime, SysUtils, ULog, UConst, UPtrInt;
 
 { TOrderedServerAddressListTS }
 
@@ -69,7 +75,9 @@ begin
   Finally
     FCritical.Release;
   End;
-  if (Result>0) then FNetData.NotifyBlackListUpdated;
+
+//  if (Result>0) then FNetData.NotifyBlackListUpdated;
+//  if (Result>0) then FNetDataNotifyEventsThread.FNotifyOnBlackListUpdated := true;
 end;
 
 procedure TOrderedServerAddressListTS.CleanNodeServersList;
@@ -149,10 +157,10 @@ begin
       P := FListByIp[i];
       Dispose(P);
     end;
-    inc(FNetData.FNetStatistics.NodeServersDeleted,FListByIp.count);
+//    inc(FNetData.FNetStatistics.NodeServersDeleted,FListByIp.count); // ** FIX **
     FListByIp.Clear;
     FListByNetConnection.Clear;
-    FNetData.FNetStatistics.NodeServersListCount := 0;
+//    FNetData.FNetStatistics.NodeServersListCount := 0; // ** FIX **
   finally
     FCritical.Release;
   end;
@@ -168,9 +176,9 @@ begin
   end;
 end;
 
-constructor TOrderedServerAddressListTS.Create(ANetData : TNetData);
+constructor TOrderedServerAddressListTS.Create( ParaNetStatistics : PNetStatistics );
 begin
-  FNetData := ANetData;
+  FNetStatistics := ParaNetStatistics;
   FCritical := TPCCriticalSection.Create(Classname);
   FListByIp := TList.Create;
   FListByNetConnection := TList.Create;
@@ -430,8 +438,8 @@ begin
   end;
   Dispose(P);
   FListByIp.Delete(index);
-  dec(FNetData.FNetStatistics.NodeServersListCount);
-  inc(FNetData.FNetStatistics.NodeServersDeleted);
+//  dec(FNetData.FNetStatistics.NodeServersListCount); // ** FIX **
+//  inc(FNetData.FNetStatistics.NodeServersDeleted); // ** FIX **
 end;
 
 function TOrderedServerAddressListTS.SecuredFindByIp(const ip: AnsiString; port: Word; var Index: Integer): Boolean;
@@ -509,7 +517,7 @@ begin
       New(P);
       P^ := nodeServerAddress;
       FListByIp.Insert(i,P);
-      Inc(FNetData.FNetStatistics.NodeServersListCount);
+//      Inc(FNetData.FNetStatistics.NodeServersListCount);  // ** FIX **
       TLog.NewLog(ltdebug,Classname,'Adding new server: '+NodeServerAddress.ip+':'+Inttostr(NodeServerAddress.port));
     end;
     if Assigned(nodeServerAddress.netConnection) then begin

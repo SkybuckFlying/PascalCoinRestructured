@@ -3,6 +3,7 @@ unit UNetStatistics;
 interface
 
 type
+  // Skybuck: this should be turned into a class, might be a bit safer ;) for now I am gonna let it be and use the pointer type as a reference.
   TNetStatistics = Record
     ActiveConnections : Integer; // All connections wiht "connected" state
     ClientsConnections : Integer; // All clients connected to me like a server with "connected" state
@@ -16,6 +17,7 @@ type
     NodeServersListCount : Integer;
     NodeServersDeleted : Integer;
   end;
+  PNetStatistics = ^TNetStatistics;
 
 var
   CT_TNetStatistics_NUL : TNetStatistics;

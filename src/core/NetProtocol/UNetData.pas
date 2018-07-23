@@ -3,7 +3,7 @@ unit UNetData;
 interface
 
 uses
-  Classes, UNetDataNotifyEventsThread, UECPrivateKey, UThread, UOrderedServerAddressListTS;
+  Classes, UNetDataNotifyEventsThread, UECPrivateKey, UThread, UOrderedServerAddressListTS, UNetStatistics, UProcessReservedAreaMessage;
 
 type
   TNetData = Class(TComponent)
