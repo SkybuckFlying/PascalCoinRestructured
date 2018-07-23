@@ -75,6 +75,35 @@ Type
     property Terminated;
   End;
 
+// Skybuck: Special TPCCustomThread specially developed by Skybuck Flying for PascalCoin.
+// Allows a thread object to be created and then execute a method of another object, which should conform to TThreadMethod procedure design.
+  TThreadMethod = procedure( Sender : TObject ) of object;
+
+  TPCCustomThreadClass = Class of TPCCustomThread;
+  TPCCustomThread = Class(TThread)
+  private
+    FDebugStep: String;
+    FStartTickCount : TTickCount;
+    FThreadMethod : TThreadMethod;
+  protected
+    procedure DoTerminate; override;
+    procedure Execute; override;
+  public
+    Class function ThreadClassFound(tclass : TPCCustomThreadClass; Exclude : TObject) : Integer;
+    Class function ThreadCount : Integer;
+    Class function GetThread(index : Integer) : TPCCustomThread;
+    Class function GetThreadByClass(tclass : TPCCustomThreadClass; Exclude : TObject) : TPCCustomThread;
+    Class Procedure ProtectEnterCriticalSection(Const Sender : TObject; var Lock : TPCCriticalSection);
+    Class Function TryProtectEnterCriticalSection(Const Sender : TObject; MaxWaitMilliseconds : Cardinal; var Lock : TPCCriticalSection) : Boolean;
+    Class Procedure ThreadsListInfo(list: TStrings);
+
+    // Skybuck: add an optional "ThreadName : string" parameter later, or try and automate this, and possibly a thread id number or something like that. * todo *
+    constructor Create( ParaThreadMethod : TThreadMethod );
+    destructor Destroy; override;
+    Property DebugStep : String read FDebugStep write FDebugStep;
+    property Terminated;
+  End;
+
   TPCThreadList = class
   private
     FList: TList;
@@ -432,6 +461,187 @@ begin
   end;
 end;
 {$ENDIF}
+
+{ -- TPCCustomThread -- }
+
+constructor TPCCustomThread.Create(ParaThreadMethod: TThreadMethod);
+begin
+  inherited Create(False);
+  FThreadMethod := ParaThreadMethod;
+  {$IFDEF HIGHLOG}TLog.NewLog(ltdebug,Classname,'Created Thread '+IntToHex(PtrInt(Self),8));{$ENDIF}
+end;
+
+destructor TPCCustomThread.Destroy;
+begin
+  inherited;
+end;
+
+procedure TPCCustomThread.DoTerminate;
+begin
+  inherited;
+end;
+
+procedure TPCCustomThread.Execute;
+Var l : TList;
+  i : Integer;
+begin
+  FStartTickCount := TPlatform.GetTickCount;
+  FDebugStep := '';
+  i := _threads.Add(Self);
+  try
+    {$IFDEF HIGHLOG}TLog.NewLog(ltdebug,Classname,'Starting Thread '+IntToHex(PtrInt(Self),8)+' in pos '+inttostr(i+1));{$ENDIF}
+    Try
+      Try
+        if Assigned(FThreadMethod) then
+        begin
+          FThreadMethod( Self );
+        end;
+        FDebugStep := 'Finalized BCExecute';
+      Finally
+        Terminate;
+      End;
+    Except
+      On E:Exception do begin
+        TLog.NewLog(lterror,Classname,'Exception inside a Thread at step: '+FDebugStep+' ('+E.ClassName+'): '+E.Message);
+        Raise;
+      end;
+    End;
+  finally
+    l := _threads.LockList;
+    Try
+      i := l.Remove(Self);
+      {$IFDEF HIGHLOG}TLog.NewLog(ltdebug,Classname,'Finalizing Thread in pos '+inttostr(i+1)+'/'+inttostr(l.Count+1)+' working time: '+FormatFloat('0.000',TPlatform.GetElapsedMilliseconds(FStartTickCount) / 1000)+' sec');{$ENDIF}
+    Finally
+      _threads.UnlockList;
+    End;
+  end;
+end;
+
+class function TPCCustomThread.GetThread(index: Integer): TPCCustomThread;
+Var l : TList;
+begin
+  Result := Nil;
+  l := _threads.LockList;
+  try
+    if (index<0) or (index>=l.Count) then exit;
+    Result := TPCCustomThread(l[index]);
+  finally
+    _threads.UnlockList;
+  end;
+end;
+
+class function TPCCustomThread.GetThreadByClass(tclass: TPCCustomThreadClass; Exclude: TObject): TPCCustomThread;
+Var l : TList;
+  i : Integer;
+begin
+  Result := Nil;
+  if Not Assigned(_threads) then exit;
+  l := _threads.LockList;
+  try
+    for i := 0 to l.Count - 1 do begin
+      if (TPCCustomThread(l[i]) is tclass) And ((l[i])<>Exclude) then begin
+        Result := TPCCustomThread(l[i]);
+        exit;
+      end;
+    end;
+  finally
+    _threads.UnlockList;
+  end;
+end;
+
+class procedure TPCCustomThread.ProtectEnterCriticalSection(Const Sender : TObject; var Lock: TPCCriticalSection);
+begin
+  {$IFDEF HIGHLOG}
+  if Not Lock.TryEnter then begin
+    Lock.Acquire;
+  end;
+  {$ELSE}
+  Lock.Acquire;
+  {$ENDIF}
+end;
+
+class function TPCCustomThread.ThreadClassFound(tclass: TPCCustomThreadClass; Exclude : TObject): Integer;
+Var l : TList;
+begin
+  Result := -1;
+  if Not Assigned(_threads) then exit;
+  l := _threads.LockList;
+  try
+    for Result := 0 to l.Count - 1 do begin
+      if (TPCCustomThread(l[Result]) is tclass) And ((l[Result])<>Exclude) then exit;
+    end;
+    Result := -1;
+  finally
+    _threads.UnlockList;
+  end;
+end;
+
+class function TPCCustomThread.ThreadCount: Integer;
+Var l : TList;
+begin
+  l := _threads.LockList;
+  try
+    Result := l.Count;
+  finally
+    _threads.UnlockList;
+  end;
+end;
+
+class procedure TPCCustomThread.ThreadsListInfo(list: TStrings);
+Var l : TList;
+  i : Integer;
+begin
+  l := _threads.LockList;
+  try
+    list.BeginUpdate;
+    list.Clear;
+    for i := 0 to l.Count - 1 do begin
+      list.Add(Format('%.2d/%.2d <%s> Time:%s sec - Step: %s',[i+1,l.Count,TPCCustomThread(l[i]).ClassName,FormatFloat('0.000',(TPlatform.GetElapsedMilliseconds(TPCCustomThread(l[i]).FStartTickCount) / 1000)),TPCCustomThread(l[i]).DebugStep] ));
+    end;
+    list.EndUpdate;
+  finally
+    _threads.UnlockList;
+  end;
+end;
+
+class function TPCCustomThread.TryProtectEnterCriticalSection(const Sender: TObject;
+  MaxWaitMilliseconds: Cardinal; var Lock: TPCCriticalSection): Boolean;
+Var tc : TTickCount;
+  {$IFDEF HIGHLOG}
+  tc2,tc3,lockStartedTimestamp : TTickCount;
+  lockCurrThread : TThreadID;
+  lockWatingForCounter : Cardinal;
+  s : String;
+  {$ENDIF}
+begin
+  tc := TPlatform.GetTickCount;
+  if MaxWaitMilliseconds>60000 then MaxWaitMilliseconds := 60000;
+  {$IFDEF HIGHLOG}
+  lockWatingForCounter := Lock.WaitingForCounter;
+  lockStartedTimestamp := Lock.StartedTickCount;
+  lockCurrThread := Lock.CurrentThread;
+  {$ENDIF}
+  Repeat
+    Result := Lock.TryEnter;
+    if Not Result then sleep(1);
+  Until (Result) Or (TPlatform.GetElapsedMilliseconds(tc)>MaxWaitMilliseconds);
+  {$IFDEF HIGHLOG}
+  if Not Result then begin
+    tc2 := TPlatform.GetTickCount;
+    if lockStartedTimestamp=0 then lockStartedTimestamp := Lock.StartedTickCount;
+    if lockStartedTimestamp=0 then tc3 := 0
+    else tc3 := tc2-lockStartedTimestamp;
+    s := Format('Cannot Protect a critical section %s %s class %s after %d milis locked by %s waiting %d-%d elapsed milis: %d',
+      [IntToHex(PtrInt(Lock),8),Lock.Name,
+      Sender.ClassName,tc2-tc,
+      IntToHex(lockCurrThread,8)+'-'+IntToHex(Lock.CurrentThread,8),
+      lockWatingForCounter,Lock.WaitingForCounter,
+      tc3
+      ]);
+    TLog.NewLog(ltdebug,Classname,s);
+  end;
+  {$ENDIF}
+end;
 
 initialization
   _threads := TPCThreadList.Create('GLOBAL_THREADS');

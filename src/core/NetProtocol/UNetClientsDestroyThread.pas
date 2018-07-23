@@ -2,6 +2,9 @@ unit UNetClientsDestroyThread;
 
 interface
 
+uses
+  UNetData;   // circular unit reference problem 6, performing git commit.
+
 type
   TNetClientsDestroyThread = Class(TPCThread)
   private

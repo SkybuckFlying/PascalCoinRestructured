@@ -72,7 +72,6 @@ uses
   UThreadGetNewBlockChainFromClient in 'core\NetProtocol\UThreadGetNewBlockChainFromClient.pas',
   UNetDataNotifyEventsThread in 'core\NetProtocol\UNetDataNotifyEventsThread.pas',
   UNetClientsDestroyThread in 'core\NetProtocol\UNetClientsDestroyThread.pas',
-  UThreadCheckConnections in 'core\NetProtocol\UThreadCheckConnections.pas',
   UThreadDiscoverConnection in 'core\NetProtocol\UThreadDiscoverConnection.pas',
   UNetClientThread in 'core\NetProtocol\UNetClientThread.pas',
   UNetServerClient in 'core\NetProtocol\UNetServerClient.pas',
@@ -138,7 +137,8 @@ uses
   UECPrivateKey in 'core\Crypto\UECPrivateKey.pas',
   UECDSA_Public in 'core\Crypto\UECDSA_Public.pas',
   UCryptoException in 'core\Crypto\UCryptoException.pas',
-  UNotifyEventToMany in 'core\BaseTypes\UNotifyEventToMany.pas';
+  UNotifyEventToMany in 'core\BaseTypes\UNotifyEventToMany.pas',
+  UCustomThread in 'core\Thread\UCustomThread.pas';
 
 {$R *.res}
 
