@@ -2,6 +2,9 @@ unit UOrderedServerAddressListTS;
 
 interface
 
+uses
+  UNetData; // third circular unit references, saving to git.
+
 type
   // This will maintain a list sorted by 2 values: ip/port and netConnection in thread safe mode
   // Using this object, NodeServerAddress can be more high in length and also more quick to search

@@ -3,7 +3,7 @@ unit UAccountComp;
 interface
 
 uses
-  UAccountKey, UAccountInfo, Classes, URawBytes, UCrypto, UAccount, UOperationBlock, UBlockAccount;
+  UAccountKey, UAccountInfo, Classes, URawBytes, UCrypto, UAccount, UOperationBlock, UBlockAccount, UECPrivateKey;
 
 type
   { TAccountComp }

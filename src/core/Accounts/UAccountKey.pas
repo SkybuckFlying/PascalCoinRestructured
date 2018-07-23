@@ -3,7 +3,7 @@ unit UAccountKey;
 interface
 
 uses
-  UCrypto;
+  UECDSA_Public;
 
 type
   TAccountKey = TECDSA_Public;

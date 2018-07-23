@@ -19,7 +19,7 @@ unit UOpTransaction;
 
 interface
 
-Uses UCrypto, UBlockChain, Classes, UAccounts, UAccountKey, UPCOperation, UOperationResume, UAccountPreviousBlockInfo, UPCSafeBoxTransaction, UOpChangeAccountInfoType;
+Uses UCrypto, UBlockChain, Classes, UAccounts, UAccountKey, UPCOperation, UOperationResume, UAccountPreviousBlockInfo, UPCSafeBoxTransaction, UOpChangeAccountInfoType, UECDSA_Public, UECPrivateKey;
 
 Type
   // Operations Type

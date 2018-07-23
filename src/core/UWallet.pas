@@ -20,7 +20,7 @@ unit UWallet;
 interface
 
 uses
-  Classes, USettings, UBlockChain, UAccounts, UCrypto, UBaseTypes, UAccountKey, UOrderedAccountKeysList, UPCSafeBox;
+  Classes, USettings, UBlockChain, UAccounts, UCrypto, UBaseTypes, UAccountKey, UOrderedAccountKeysList, UPCSafeBox, UECPrivateKey, UECDSA_Public;
 
 Type
   TWalletKey = Record

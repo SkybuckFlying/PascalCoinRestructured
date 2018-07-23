@@ -21,7 +21,7 @@ interface
 
 uses
   Classes, SysUtils, UCrypto, UBlockChain, UAccounts, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UPCOperation, UOperationResume, UPCSafeBoxTransaction,
-  UAccountPreviousBlockInfo, UOpChangeAccountInfoType, UAccountState;
+  UAccountPreviousBlockInfo, UOpChangeAccountInfoType, UAccountState, UECPrivateKey;
 
 Type
 

@@ -135,7 +135,10 @@ uses
   UNetTransferType in 'core\NetProtocol\Types\UNetTransferType.pas',
   UNetMessage_Hello in 'core\NetProtocol\Types\UNetMessage_Hello.pas',
   UNetRequestRegistered in 'core\NetProtocol\Types\UNetRequestRegistered.pas',
-  UProcessReservedAreaMessage in 'core\NetProtocol\UProcessReservedAreaMessage.pas';
+  UProcessReservedAreaMessage in 'core\NetProtocol\UProcessReservedAreaMessage.pas',
+  UECPrivateKey in 'core\Crypto\UECPrivateKey.pas',
+  UECDSA_Public in 'core\Crypto\UECDSA_Public.pas',
+  UCryptoException in 'core\Crypto\UCryptoException.pas';
 
 {$R *.res}
 

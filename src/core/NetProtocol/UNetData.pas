@@ -3,7 +3,7 @@ unit UNetData;
 interface
 
 uses
-  Classes, UNetDataNotifyEventsThread;
+  Classes, UNetDataNotifyEventsThread, UECPrivateKey, UThread, UOrderedServerAddressListTS;
 
 type
   TNetData = Class(TComponent)
@@ -21,13 +21,8 @@ type
     FIsDiscoveringServers : Boolean;
     FIsGettingNewBlockChainFromClient : Boolean;
     FOnConnectivityChanged : TNotifyEventToMany;
-    FOnNetConnectionsUpdated: TNotifyEvent;
-    FOnNodeServersUpdated: TNotifyEvent;
-    FOnBlackListUpdated: TNotifyEvent;
     FThreadCheckConnections : TThreadCheckConnections;
-    FOnReceivedHelloMessage: TNotifyEvent;
     FNetStatistics: TNetStatistics;
-    FOnStatisticsChanged: TNotifyEvent;
     FMaxRemoteOperationBlock : TOperationBlock;
     FFixedServers : TNodeServerAddressArray;
     FNetClientsDestroyThread : TNetClientsDestroyThread;
@@ -83,7 +78,7 @@ type
     Property IsGettingNewBlockChainFromClient : Boolean read FIsGettingNewBlockChainFromClient;
     Property MaxRemoteOperationBlock : TOperationBlock read FMaxRemoteOperationBlock;
     Property NodePrivateKey : TECPrivateKey read FNodePrivateKey;
-    property OnConnectivityChanged : TNotifyEventToMany read FOnConnectivityChanged;
+    property OnConnectivityChanged : TNotifyEventToMany read FNetDataNotifyEventsThread.FOnConnectivityChanged;
     Property OnNetConnectionsUpdated : TNotifyEvent read FOnNetConnectionsUpdated write FOnNetConnectionsUpdated;
     Property OnNodeServersUpdated : TNotifyEvent read FOnNodeServersUpdated write FOnNodeServersUpdated;
     Property OnBlackListUpdated : TNotifyEvent read FOnBlackListUpdated write FOnBlackListUpdated;
@@ -105,7 +100,7 @@ type
 
 implementation
 
-Var _NetData : TNetData = nil;
+Var _NetData : TNetData = nil; // Skybuck: another potential global var, investigate later.
 
 Type PNetRequestRegistered = ^TNetRequestRegistered;
 

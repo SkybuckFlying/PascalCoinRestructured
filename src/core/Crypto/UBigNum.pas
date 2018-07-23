@@ -49,7 +49,7 @@ type
 implementation
 
 uses
-  UOpenSSL, SysUtils, UCrypto;
+  UOpenSSL, SysUtils, UCrypto, UCryptoException;
 
 { TBigNum }
 
