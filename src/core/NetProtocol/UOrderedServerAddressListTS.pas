@@ -24,10 +24,10 @@ type
     Function SecuredFindByIp(const ip : AnsiString; port : Word; var Index: Integer): Boolean;
     Function SecuredFindByNetConnection(const search : TNetConnection; var Index: Integer): Boolean;
   protected
-    function DeleteNetConnection(netConnection : TNetConnection) : Boolean;
   public
     Constructor Create( ParaNetStatistics : PNetStatistics);
     Destructor Destroy; Override;
+
     Procedure Clear;
     Function Count : Integer;
     Function CleanBlackList(forceCleanAll : Boolean) : Integer;
@@ -40,7 +40,14 @@ type
     Procedure UpdateNetConnection(netConnection : TNetConnection);
     procedure GetNodeServersToConnnect(maxNodes : Integer; useArray : Boolean; var nsa : TNodeServerAddressArray);
     Function GetValidNodeServers(OnlyWhereIConnected : Boolean; Max : Integer): TNodeServerAddressArray;
+
+    // Skybuck: moved to here to offer access to UNetConnection
+    function DeleteNetConnection(netConnection : TNetConnection) : Boolean;
+
     property AllowDeleteOnClean : Boolean read FAllowDeleteOnClean write FAllowDeleteOnClean;
+
+    // Skybuck: property added to offer access to UNetData
+    property Critical : TPCCriticalSection read FCritical;
   End;
 
 implementation

@@ -2,6 +2,9 @@ unit UThreadGetNewBlockChainFromClient;
 
 interface
 
+uses
+  UThread;
+
 type
   { TThreadGetNewBlockChainFromClient }
   TThreadGetNewBlockChainFromClient = Class(TPCThread)
@@ -12,6 +15,9 @@ type
   End;
 
 implementation
+
+uses
+  Classes, UOperationBlock, UNetConnection, UNetData, UNode, SysUtils;
 
 { TThreadGetNewBlockChainFromClient }
 
@@ -26,26 +32,26 @@ begin
   candidates := TList.Create;
   try
     lop := CT_OperationBlock_NUL;
-    TNetData.NetData.FMaxRemoteOperationBlock := CT_OperationBlock_NUL;
+    TNetData.NetData.MaxRemoteOperationBlock := CT_OperationBlock_NUL;
     // First round: Find by most work
     maxWork := 0;
     j := TNetData.NetData.ConnectionsCountAll;
     nc := Nil;
     for i := 0 to j - 1 do begin
       if TNetData.NetData.GetConnection(i,nc) then begin
-        if (nc.FRemoteAccumulatedWork>maxWork) And (nc.FRemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) then begin
-          maxWork := nc.FRemoteAccumulatedWork;
+        if (nc.RemoteAccumulatedWork>maxWork) And (nc.RemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) then begin
+          maxWork := nc.RemoteAccumulatedWork;
         end;
         // Preventing downloading
-        if nc.FIsDownloadingBlocks then exit;
+        if nc.IsDownloadingBlocks then exit;
       end;
     end;
     if (maxWork>0) then begin
       for i := 0 to j - 1 do begin
         If TNetData.NetData.GetConnection(i,nc) then begin
-          if (nc.FRemoteAccumulatedWork>=maxWork) then begin
+          if (nc.RemoteAccumulatedWork>=maxWork) then begin
             candidates.Add(nc);
-            lop := nc.FRemoteOperationBlock;
+            lop := nc.RemoteOperationBlock;
           end;
         end;
       end;
@@ -54,29 +60,29 @@ begin
     if candidates.Count=0 then begin
       for i := 0 to j - 1 do begin
         if (TNetData.NetData.GetConnection(i,nc)) then begin
-          if (nc.FRemoteOperationBlock.block>=TNode.Node.Bank.BlocksCount) And
-             (nc.FRemoteOperationBlock.block>=lop.block) then begin
-             lop := nc.FRemoteOperationBlock;
+          if (nc.RemoteOperationBlock.block>=TNode.Node.Bank.BlocksCount) And
+             (nc.RemoteOperationBlock.block>=lop.block) then begin
+             lop := nc.RemoteOperationBlock;
           end;
         end;
       end;
       if (lop.block>0) then begin
         for i := 0 to j - 1 do begin
           If (TNetData.NetData.GetConnection(i,nc)) then begin
-            if (nc.FRemoteOperationBlock.block>=lop.block) then begin
+            if (nc.RemoteOperationBlock.block>=lop.block) then begin
                candidates.Add(nc);
             end;
           end;
         end;
       end;
     end;
-    TNetData.NetData.FMaxRemoteOperationBlock := lop;
+    TNetData.NetData.MaxRemoteOperationBlock := lop;
     if (candidates.Count>0) then begin
       // Random a candidate
       i := 0;
       if (candidates.Count>1) then i := Random(candidates.Count); // i = 0..count-1
       nc := TNetConnection(candidates[i]);
-      TNetData.NetData.GetNewBlockChainFromClient(nc,Format('Candidate block: %d sum: %d',[nc.FRemoteOperationBlock.block,nc.FRemoteAccumulatedWork]));
+      TNetData.NetData.GetNewBlockChainFromClient(nc,Format('Candidate block: %d sum: %d',[nc.RemoteOperationBlock.block,nc.RemoteAccumulatedWork]));
     end;
   finally
     candidates.Free;

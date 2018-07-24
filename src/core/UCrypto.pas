@@ -60,9 +60,7 @@ Type
     class function DecodeSignature(const rawSignature : TRawBytes; out signature : TECDSA_SIG) : Boolean;
   End;
 
-
 var
-  CT_TECDSA_Public_Nul : TECDSA_Public; // initialized in initialization section
   CT_TECDSA_SIG_Nul : TECDSA_SIG;
 
 implementation
@@ -383,9 +381,9 @@ end;
 
 
 initialization
-  Initialize(CT_TECDSA_Public_Nul);
   Initialize(CT_TECDSA_SIG_Nul);
 
+  // Skybuck: On windows this basically means RandSeed is set to a value from high performance counter
   Randomize; // Initial random generator based on system time
 finalization
 

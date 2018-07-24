@@ -2,6 +2,9 @@ unit UThreadDiscoverConnection;
 
 interface
 
+uses
+  UThread, UNodeServerAddress, Classes;
+
 type
   TThreadDiscoverConnection = Class(TPCThread)
     FNodeServerAddress : TNodeServerAddress;
@@ -12,6 +15,9 @@ type
   End;
 
 implementation
+
+uses
+  UNetClient, ULog, SysUtils, UNetData;
 
 { TThreadDiscoverConnection }
 

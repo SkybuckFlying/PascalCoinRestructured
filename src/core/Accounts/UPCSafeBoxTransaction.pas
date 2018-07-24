@@ -47,7 +47,7 @@ type
 implementation
 
 uses
-  UConst, UAccountComp, SysUtils, UCrypto, UAccountState, UAccountUpdateStyle, ULog;
+  UConst, UAccountComp, SysUtils, UCrypto, UAccountState, UAccountUpdateStyle, ULog, UECDSA_Public;
 
 { TPCSafeBoxTransaction }
 

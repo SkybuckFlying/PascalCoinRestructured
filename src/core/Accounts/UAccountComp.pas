@@ -50,7 +50,7 @@ type
 implementation
 
 uses
-  UConst, UAccountState, UStreamOp, SysUtils, UBaseType, Math, UOpenSSL, UBigNum;
+  UConst, UAccountState, UStreamOp, SysUtils, UBaseType, Math, UOpenSSL, UBigNum, UECDSA_Public;
 
 { TAccountComp }
 Const CT_Base58 : AnsiString = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';

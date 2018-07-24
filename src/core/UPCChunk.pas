@@ -1,4 +1,4 @@
-unit UChunk;
+unit UPCChunk;
 
 {$IFDEF FPC}
   {$mode delphi}
@@ -20,13 +20,10 @@ unit UChunk;
 interface
 
 uses
-  Classes, SysUtils,  ZLib, {$IFDEF FPC} zStream, {$ENDIF}
-  UAccounts, ULog, UConst, UCrypto;
+  Classes, UPCSafeBoxHeader;
 
 type
-
   { TPCChunk }
-
   TPCChunk = Class
   private
   public
@@ -34,7 +31,13 @@ type
     class function LoadSafeBoxFromChunk(Chunk, DestStream : TStream; var safeBoxHeader : TPCSafeBoxHeader; var errors : AnsiString) : Boolean;
   end;
 
+var
+  CT_SafeBoxChunkIdentificator : string = 'SafeBoxChunk';
+
 implementation
+
+uses
+  UPCSafeBox, UStreamOp, ZLib, {$IFDEF FPC} zStream, {$ENDIF} SysUtils, ULog, UConst;
 
 { TPCChunk }
 

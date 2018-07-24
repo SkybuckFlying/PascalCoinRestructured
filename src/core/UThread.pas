@@ -93,8 +93,8 @@ Type
     Class function ThreadCount : Integer;
     Class function GetThread(index : Integer) : TPCCustomThread;
     Class function GetThreadByClass(tclass : TPCCustomThreadClass; Exclude : TObject) : TPCCustomThread;
-    Class Procedure ProtectEnterCriticalSection(Const Sender : TObject; var Lock : TPCCriticalSection);
-    Class Function TryProtectEnterCriticalSection(Const Sender : TObject; MaxWaitMilliseconds : Cardinal; var Lock : TPCCriticalSection) : Boolean;
+    Class Procedure ProtectEnterCriticalSection(Const Sender : TObject; var Lock : TPCCriticalSection); // Skybuck: these var parameters present a problem for passing locks via properties ! If var is not needed then please remove or make them consts !!
+    Class Function TryProtectEnterCriticalSection(Const Sender : TObject; MaxWaitMilliseconds : Cardinal; var Lock : TPCCriticalSection) : Boolean; // Skybuck: these var parameters present a problem for passing locks via properties ! If var is not needed then please remove or make them consts !!
     Class Procedure ThreadsListInfo(list: TStrings);
 
     // Skybuck: add an optional "ThreadName : string" parameter later, or try and automate this, and possibly a thread id number or something like that. * todo *

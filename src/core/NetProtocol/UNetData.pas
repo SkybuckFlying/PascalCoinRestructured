@@ -21,6 +21,7 @@ type
     FOnNodeServersUpdated: TNotifyEvent;
     FOnBlackListUpdated: TNotifyEvent;
 
+    FTerminatedAllConnections : boolean; // Skybuck: moved from DestroyClientsThread to here.
     FMaxNodeServersAddressesBuffer: Integer;
     FMaxServersConnected: Integer;
     FMinServersConnected: Integer;
@@ -50,7 +51,16 @@ type
     Procedure DiscoverServersTerminated(Sender : TObject);
   protected
     procedure DoProcessReservedAreaMessage(senderConnection : TNetConnection; const headerData : TNetHeaderData; receivedData : TStream; responseData : TStream); virtual;
+
+    procedure CheckConnectionsThread( Sender : TObject );
+
+    procedure SynchronizedNotify;
+    procedure NotifyEventsThread( Sender : TObject );
+
+    procedure DestroyClientsThread( Sender : TObject );
+    procedure WaitForTerminatedAllConnections;
   public
+
     // Skybuck: moved to here to offer access to UNetServer
     Procedure IncStatistics(incActiveConnections,incClientsConnections,incServersConnections,incServersConnectionsWithResponse : Integer; incBytesReceived, incBytesSend : Int64);
 
@@ -91,7 +101,7 @@ type
     Property NetStatistics : TNetStatistics read FNetStatistics;
     Property IsDiscoveringServers : Boolean read FIsDiscoveringServers;
     Property IsGettingNewBlockChainFromClient : Boolean read FIsGettingNewBlockChainFromClient;
-    Property MaxRemoteOperationBlock : TOperationBlock read FMaxRemoteOperationBlock;
+    Property MaxRemoteOperationBlock : TOperationBlock read FMaxRemoteOperationBlock write FMaxRemoteOperationBlock; // Skybuck: write propery added for UThreadGetNewBlockChainFromClient
     Property NodePrivateKey : TECPrivateKey read FNodePrivateKey;
     property OnConnectivityChanged : TNotifyEventToMany read FOnConnectivityChanged;
     Property OnNetConnectionsUpdated : TNotifyEvent read FOnNetConnectionsUpdated write FOnNetConnectionsUpdated;
@@ -119,7 +129,9 @@ type
 implementation
 
 uses
-  UNetRequestRegistered, SysUtils, UConst, UTime, UNetProtocolConst, UNode, UNetClient;
+  UNetRequestRegistered, SysUtils, UConst, UTime, UNetProtocolConst, UNode, UNetClient, UNetServerClient, ULog, UPtrInt, UThreadDiscoverConnection,
+  UThreadGetNewBlockChainFromClient, UNetTransferType, UStreamOp, UAccountComp, UPCOperationsComp, UPCSafeBox, UOperationsHashTree, UOperationsResumeList,
+  UBlockAccount, URawBytes, UPCSafeBoxHeader, UPCChunk, UCrypto, UTickCount, UPlatform;
 
 Var _NetData : TNetData = nil; // Skybuck: another potential global var, investigate later.
 
@@ -347,15 +359,15 @@ begin
   FOnReceivedHelloMessage := Nil;
   FIsDiscoveringServers := false;
   FRegisteredRequests := TPCThreadList.Create('TNetData_RegisteredRequests');
-  FNodeServersAddresses := TOrderedServerAddressListTS.Create(Self);
+  FNodeServersAddresses := TOrderedServerAddressListTS.Create(@FNetStatistics); //  Skybuck: altered, using pointer to act as an object reference
   FLastRequestId := 0;
   FNetConnections := TPCThreadList.Create('TNetData_NetConnections');
   FIsGettingNewBlockChainFromClient := false;
   FNodePrivateKey := TECPrivateKey.Create;
   FNodePrivateKey.GenerateRandomPrivateKey(CT_Default_EC_OpenSSL_NID);
-  FThreadCheckConnections := TThreadCheckConnections.Create(Self);
-  FNetDataNotifyEventsThread := TNetDataNotifyEventsThread.Create(Self);
-  FNetClientsDestroyThread := TNetClientsDestroyThread.Create(Self);
+  FThreadCheckConnections := TPCCustomThread.Create( CheckConnectionsThread );
+  FNetDataNotifyEventsThread := TPCCustomThread.Create( NotifyEventsThread );
+  FNetClientsDestroyThread := TPCCustomThread.Create( DestroyClientsThread );
   FNetworkAdjustedTime := TNetworkAdjustedTime.Create;
   FMaxNodeServersAddressesBuffer:=(CT_MAX_NODESERVERS_BUFFER DIV 2);
   FMinServersConnected:=CT_MinServersConnected;
@@ -405,8 +417,7 @@ begin
     FNetConnections.UnlockList;
   End;
 
-
-  FNetClientsDestroyThread.WaitForTerminatedAllConnections;
+  WaitForTerminatedAllConnections;
   FNetClientsDestroyThread.Terminate;
   FNetClientsDestroyThread.WaitFor;
   FreeAndNil(FNetClientsDestroyThread);
@@ -594,7 +605,7 @@ begin
   try
     for i := 0 to L.Count - 1 do begin
       Result := TNetConnection( l[i] );
-      If TAccountComp.EqualAccountKeys(Result.FClientPublicKey,Sender.FClientPublicKey) And (Sender<>Result) then exit;
+      If TAccountComp.EqualAccountKeys(Result.ClientPublicKey,Sender.ClientPublicKey) And (Sender<>Result) then exit;
     end;
   finally
     FNetConnections.UnlockList;
@@ -845,7 +856,7 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
           BlocksList.Free;
         end;
         start := Bank.BlocksCount;
-      until (Bank.BlocksCount=Connection.FRemoteOperationBlock.block+1) Or (finished)
+      until (Bank.BlocksCount=Connection.RemoteOperationBlock.block+1) Or (finished)
         // Allow to do not download ALL new blockchain in a separate folder, only needed blocks!
         Or (Bank.SafeBox.WorkSum > (TNode.Node.Bank.SafeBox.WorkSum + $FFFFFFFF) );
       // New Build 1.5 more work vs more high
@@ -923,10 +934,10 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
           oldBlockchainOperations.Free;
         end;
       end else begin
-        if (Not IsAScam) And (Connection.FRemoteAccumulatedWork > TNode.Node.Bank.SafeBox.WorkSum) then begin
+        if (Not IsAScam) And (Connection.RemoteAccumulatedWork > TNode.Node.Bank.SafeBox.WorkSum) then begin
           // Possible scammer!
           Connection.DisconnectInvalidClient(false,Format('Possible scammer! Says blocks:%d Work:%d - Obtained blocks:%d work:%d',
-            [Connection.FRemoteOperationBlock.block+1,Connection.FRemoteAccumulatedWork,
+            [Connection.RemoteOperationBlock.block+1,Connection.RemoteAccumulatedWork,
              Bank.BlocksCount,Bank.SafeBox.WorkSum]));
         end;
       end;
@@ -998,7 +1009,7 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
   Begin
     Result := False;
     // Will try to download penultimate saved safebox
-    _blockcount := ((Connection.FRemoteOperationBlock.block DIV CT_BankToDiskEveryNBlocks)-1) * CT_BankToDiskEveryNBlocks;
+    _blockcount := ((Connection.RemoteOperationBlock.block DIV CT_BankToDiskEveryNBlocks)-1) * CT_BankToDiskEveryNBlocks;
     If not Do_GetOperationBlock(_blockcount,5000,op) then begin
       Connection.DisconnectInvalidClient(false,Format('Cannot obtain operation block %d for downloading safebox',[_blockcount]));
       exit;
@@ -1098,10 +1109,10 @@ begin
   end else TLog.NewLog(ltdebug,CT_LogSender,'Starting receiving: '+why);
   Try
     FIsGettingNewBlockChainFromClient := true;
-    FMaxRemoteOperationBlock := Connection.FRemoteOperationBlock;
+    FMaxRemoteOperationBlock := Connection.RemoteOperationBlock;
     if TNode.Node.Bank.BlocksCount=0 then begin
       TLog.NewLog(ltdebug,CT_LogSender,'I have no blocks');
-      If Connection.FRemoteOperationBlock.protocol_version>=CT_PROTOCOL_2 then begin
+      If Connection.RemoteOperationBlock.protocol_version>=CT_PROTOCOL_2 then begin
         DownloadSafeBox(False);
       end else begin
         Connection.Send_GetBlocks(0,10,rid);
@@ -1109,7 +1120,7 @@ begin
       exit;
     end;
     TLog.NewLog(ltdebug,CT_LogSender,'Starting GetNewBlockChainFromClient at client:'+Connection.ClientRemoteAddr+
-      ' with OperationBlock:'+TPCOperationsComp.OperationBlockToText(Connection.FRemoteOperationBlock)+' (My block: '+TPCOperationsComp.OperationBlockToText(TNode.Node.Bank.LastOperationBlock)+')');
+      ' with OperationBlock:'+TPCOperationsComp.OperationBlockToText(Connection.RemoteOperationBlock)+' (My block: '+TPCOperationsComp.OperationBlockToText(TNode.Node.Bank.LastOperationBlock)+')');
     // NOTE: FRemoteOperationBlock.block >= TNode.Node.Bank.BlocksCount
     // First capture same block than me (TNode.Node.Bank.BlocksCount-1) to check if i'm an orphan block...
     my_op := TNode.Node.Bank.LastOperationBlock;
@@ -1128,7 +1139,7 @@ begin
       TLog.NewLog(ltinfo,CT_LogSender,'My blockchain is not equal... received: '+TPCOperationsComp.OperationBlockToText(client_op)+' My: '+TPCOperationsComp.OperationBlockToText(my_op));
       if Not FindLastSameBlockByOperationsBlock(0,client_op.block,client_op) then begin
         TLog.NewLog(ltinfo,CT_LogSender,'No found base block to start process... Receiving ALL');
-        If (Connection.FRemoteOperationBlock.protocol_version>=CT_PROTOCOL_2) then begin
+        If (Connection.RemoteOperationBlock.protocol_version>=CT_PROTOCOL_2) then begin
           DownloadSafeBox(False);
         end else begin
           GetNewBank(-1);
@@ -1168,7 +1179,7 @@ procedure TNetData.IncStatistics(incActiveConnections, incClientsConnections,
   incServersConnections,incServersConnectionsWithResponse: Integer; incBytesReceived, incBytesSend: Int64);
 begin
   // Multithread prevention
-  FNodeServersAddresses.FCritical.Acquire;
+  FNodeServersAddresses.Critical.Acquire;
   Try
     FNetStatistics.ActiveConnections := FNetStatistics.ActiveConnections + incActiveConnections;
     FNetStatistics.ClientsConnections := FNetStatistics.ClientsConnections + incClientsConnections;
@@ -1180,7 +1191,7 @@ begin
     FNetStatistics.BytesReceived := FNetStatistics.BytesReceived + incBytesReceived;
     FNetStatistics.BytesSend := FNetStatistics.BytesSend + incBytesSend;
   Finally
-    FNodeServersAddresses.FCritical.Release;
+    FNodeServersAddresses.Critical.Release;
   End;
   NotifyStatisticsChanged;
   if (incBytesReceived<>0) Or (incBytesSend<>0) then begin
@@ -1251,7 +1262,7 @@ end;
 
 procedure TNetData.NotifyBlackListUpdated;
 begin
-  FNetDataNotifyEventsThread.FNotifyOnBlackListUpdated := true;
+  FNotifyOnBlackListUpdated := true;
 end;
 
 procedure TNetData.NotifyConnectivityChanged;
@@ -1261,22 +1272,22 @@ end;
 
 procedure TNetData.NotifyNetConnectionUpdated;
 begin
-  FNetDataNotifyEventsThread.FNotifyOnNetConnectionsUpdated := true;
+  FNotifyOnNetConnectionsUpdated := true;
 end;
 
 procedure TNetData.NotifyNodeServersUpdated;
 begin
-  FNetDataNotifyEventsThread.FNotifyOnNodeServersUpdated := true;
+  FNotifyOnNodeServersUpdated := true;
 end;
 
 procedure TNetData.NotifyReceivedHelloMessage;
 begin
-  FNetDataNotifyEventsThread.FNotifyOnReceivedHelloMessage := true;
+  FNotifyOnReceivedHelloMessage := true;
 end;
 
 procedure TNetData.NotifyStatisticsChanged;
 begin
-  FNetDataNotifyEventsThread.FNotifyOnStatisticsChanged := true;
+  FNotifyOnStatisticsChanged := true;
 end;
 
 class function TNetData.OperationToText(operation: Word): AnsiString;
@@ -1361,7 +1372,7 @@ begin
         l.Delete(i);
         Dispose(P);
         Result := true;
-        if Assigned(Sender.FTcpIpClient) then begin
+        if Assigned(Sender.TcpIpClient) then begin
           TLog.NewLog(ltdebug,Classname,'Unregistering request to '+Sender.ClientRemoteAddr+' Op:'+OperationToText(operation)+' Id:'+inttostr(request_id)+' Total pending:'+Inttostr(l.Count));
         end else begin
           TLog.NewLog(ltdebug,Classname,'Unregistering request to (NIL) Op:'+OperationToText(operation)+' Id:'+inttostr(request_id)+' Total pending:'+Inttostr(l.Count));
@@ -1373,9 +1384,8 @@ begin
   end;
 end;
 
-
 // Skybuck: threaded routines:
-procedure TNetData.CheckConnectionsThreaded( Sender : TPCThread );
+procedure TNetData.CheckConnectionsThread( Sender : TObject );
 Var l : TList;
   i, nactive,ndeleted,nserverclients : Integer;
   netconn : TNetConnection;
@@ -1384,14 +1394,14 @@ Var l : TList;
   LastCheckTS : TTickCount;
 begin
   LastCheckTS := TPlatform.GetTickCount;
-  while (Not CheckConnectionsThreaded.Terminated) do begin
-    if ((TPlatform.GetTickCount>(FLastCheckTS+1000)) AND (Not FNetData.FIsDiscoveringServers)) then begin
+  while (Not FThreadCheckConnections.Terminated) do begin
+    if ((TPlatform.GetTickCount>(LastCheckTS+1000)) AND (Not FIsDiscoveringServers)) then begin
       nactive := 0;
       ndeleted := 0;
       nserverclients := 0;
       netserverclientstop := Nil;
       LastCheckTS := TPlatform.GetTickCount;
-      If (FNetData.FNetConnections.TryLockList(100,l)) then begin
+      If (FNetConnections.TryLockList(100,l)) then begin
         try
           newstats := CT_TNetStatistics_NUL;
           for i := l.Count-1 downto 0 do begin
@@ -1399,7 +1409,7 @@ begin
             if (netconn is TNetClient) then begin
               if (netconn.Connected) then begin
                 inc(newstats.ServersConnections);
-                if (netconn.FHasReceivedData) then inc(newstats.ServersConnectionsWithResponse);
+                if (netconn.HasReceivedData) then inc(newstats.ServersConnectionsWithResponse);
               end;
               if (Not TNetClient(netconn).Connected) And (netconn.CreatedTime+EncodeTime(0,0,5,0)<now) then begin
                 // Free this!
@@ -1411,7 +1421,7 @@ begin
                 inc(newstats.ClientsConnections);
               end;
               inc(nserverclients);
-              if (Not netconn.FDoFinalizeConnection) then begin
+              if (Not netconn.DoFinalizeConnection) then begin
                 // Build 1.0.9 BUG-101 Only disconnect old versions prior to 1.0.9
                 if not assigned(netserverclientstop) then begin
                   netserverclientstop := TNetServerClient(netconn);
@@ -1422,13 +1432,13 @@ begin
             end;
           end;
           // Update stats:
-          FNetData.FNetStatistics.ActiveConnections := newstats.ClientsConnections + newstats.ServersConnections;
-          FNetData.FNetStatistics.ClientsConnections := newstats.ClientsConnections;
-          FNetData.FNetStatistics.ServersConnections := newstats.ServersConnections;
-          FNetData.FNetStatistics.ServersConnectionsWithResponse := newstats.ServersConnectionsWithResponse;
+          FNetStatistics.ActiveConnections := newstats.ClientsConnections + newstats.ServersConnections;
+          FNetStatistics.ClientsConnections := newstats.ClientsConnections;
+          FNetStatistics.ServersConnections := newstats.ServersConnections;
+          FNetStatistics.ServersConnectionsWithResponse := newstats.ServersConnectionsWithResponse;
           // Must stop clients?
-          if (nserverclients>FNetData.MaxServersConnected) And // This is to ensure there are more serverclients than clients
-             ((nserverclients + nactive + ndeleted)>=FNetData.FMaxConnections) And (Assigned(netserverclientstop)) then begin
+          if (nserverclients>MaxServersConnected) And // This is to ensure there are more serverclients than clients
+             ((nserverclients + nactive + ndeleted)>=FMaxConnections) And (Assigned(netserverclientstop)) then begin
             TLog.NewLog(ltinfo,Classname,Format('Sending FinalizeConnection to NodeConnection %s created on %s (working time %s) - NetServerClients:%d Servers_active:%d Servers_deleted:%d',
               [netserverclientstop.Client.ClientRemoteAddr,FormatDateTime('hh:nn:ss',netserverclientstop.CreatedTime),
                FormatDateTime('hh:nn:ss',Now - netserverclientstop.CreatedTime),
@@ -1436,11 +1446,11 @@ begin
             netserverclientstop.FinalizeConnection;
           end;
         finally
-          FNetData.FNetConnections.UnlockList;
+          FNetConnections.UnlockList;
         end;
-        if (nactive<=FNetData.MaxServersConnected) And (Not Terminated) then begin
+        if (nactive<=MaxServersConnected) And (Not FThreadCheckConnections.Terminated) then begin
           // Discover
-          FNetData.DiscoverServers;
+          DiscoverServers;
         end;
       end;
     end;
@@ -1448,34 +1458,34 @@ begin
   end;
 end;
 
-procedure TNetClientsDestroyThread.TerminateAllConnectionsThreaded;
+procedure TNetData.DestroyClientsThread( Sender : TObject );
 Var l,l_to_del : TList;
   i : Integer;
 begin
   FTerminatedAllConnections := true;
   l_to_del := TList.Create;
   Try
-    while not TNetClientsDestroyThread.Terminated do begin
+    while not FNetClientsDestroyThread.Terminated do begin
       l_to_del.Clear;
-      l := FNetData.NetConnections.LockList;
+      l := NetConnections.LockList;
       try
         FTerminatedAllConnections := l.Count=0;
         for i := 0 to l.Count-1 do begin
           If (TObject(l[i]) is TNetClient) And (not TNetConnection(l[i]).Connected)
-            And (TNetConnection(l[i]).FDoFinalizeConnection)
+            And (TNetConnection(l[i]).DoFinalizeConnection)
             And (Not TNetConnection(l[i]).IsConnecting) then begin
             l_to_del.Add(l[i]);
           end;
         end;
       finally
-        FNetData.NetConnections.UnlockList;
+        NetConnections.UnlockList;
       end;
       sleep(500); // Delay - Sleep time before destroying (1.5.3)
       if l_to_del.Count>0 then begin
         TLog.NewLog(ltDebug,ClassName,'Destroying NetClients: '+inttostr(l_to_del.Count));
         for i := 0 to l_to_del.Count - 1 do begin
           Try
-            DebugStep := 'Destroying NetClient '+TNetConnection(l_to_del[i]).ClientRemoteAddr;
+            FNetClientsDestroyThread.DebugStep := 'Destroying NetClient '+TNetConnection(l_to_del[i]).ClientRemoteAddr;
             TNetConnection(l_to_del[i]).Free;
           Except
             On E:Exception do begin
@@ -1491,9 +1501,9 @@ begin
   end;
 end;
 
-procedure TNetClientsDestroyThread.WaitForTerminatedAllConnections;
+procedure TNetData.WaitForTerminatedAllConnections;
 begin
-  while (Not TNetClientsDestroyThread.FTerminatedAllConnections) do begin
+  while (Not FTerminatedAllConnections) do begin
     TLog.NewLog(ltdebug,ClassName,'Waiting all connections terminated');
     Sleep(100);
   end;
@@ -1504,23 +1514,9 @@ end;
 { TNetDataNotifyEventsThread ensures that notifications of TNetData object
   will be in main Thread calling a Synchronized method }
 
-procedure TNetData.NotifyEventsThreaded;
-begin
-  while (not TNotifyEventsThread.Terminated) do begin
-    if (FNotifyOnReceivedHelloMessage) Or
-       (FNotifyOnStatisticsChanged) Or
-       (FNotifyOnNetConnectionsUpdated) Or
-       (FNotifyOnNodeServersUpdated) Or
-       (FNotifyOnBlackListUpdated) then begin
-      Synchronize(SynchronizedNotify);
-    end;
-    Sleep(10);
-  end;
-end;
-
 procedure TNetData.SynchronizedNotify;
 begin
-  if TNotifyEventsThread.Terminated then exit;
+  if FNetDataNotifyEventsThread.Terminated then exit;
 
   // nil/sender used to be FNetData, probably not thread-safe to pass that anyway ;)
   if FNotifyOnReceivedHelloMessage then begin
@@ -1542,6 +1538,23 @@ begin
   if FNotifyOnBlackListUpdated then begin
     FNotifyOnBlackListUpdated := false;
     If Assigned(FOnBlackListUpdated) then FOnBlackListUpdated(nil);
+  end;
+end;
+
+procedure TNetData.NotifyEventsThread( Sender : TObject );
+begin
+  while (not FNetDataNotifyEventsThread.Terminated) do begin
+    if (FNotifyOnReceivedHelloMessage) Or
+       (FNotifyOnStatisticsChanged) Or
+       (FNotifyOnNetConnectionsUpdated) Or
+       (FNotifyOnNodeServersUpdated) Or
+       (FNotifyOnBlackListUpdated) then begin
+      // Skybuck:
+//      TPCCustomThread(Sender).Synchronize(SynchronizedNotify); // also not working... double damn ;) :)
+//      FNetDataNotifyEventsThread.Synchronize(SynchronizedNotify); // inaccessible here... damn.
+        TThread.Synchronize(FNetDataNotifyEventsThread,SynchronizedNotify); // this should be the solution ! =D
+    end;
+    Sleep(10);
   end;
 end;
 

@@ -36,7 +36,6 @@ type
     procedure SetConnected(const Value: Boolean);
     procedure TcpClient_OnConnect(Sender: TObject);
     procedure TcpClient_OnDisconnect(Sender: TObject);
-    Function DoSendAndWaitForResponse(operation: Word; RequestId: Integer; SendDataBuffer, ReceiveDataBuffer: TStream; MaxWaitTime : Cardinal; var HeaderData : TNetHeaderData) : Boolean;
     Procedure DoProcess_Hello(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_Message(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_GetBlocks_Request(HeaderData : TNetHeaderData; DataBuffer: TStream);
@@ -49,7 +48,6 @@ type
     Procedure DoProcess_GetAccount_Request(HeaderData : TNetHeaderData; DataBuffer: TStream);
     Procedure DoProcess_GetPendingOperations;
     Function ReadTcpClientBuffer(MaxWaitMiliseconds : Cardinal; var HeaderData : TNetHeaderData; BufferData : TStream) : Boolean;
-    Procedure DisconnectInvalidClient(ItsMyself : Boolean; Const why : AnsiString);
     function GetClient: TNetTcpIpClient;
   protected
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
@@ -64,6 +62,11 @@ type
     procedure DoProcessBuffer;
     Procedure SetClient(Const Value : TNetTcpIpClient);
     Procedure SendError(NetTranferType : TNetTransferType; operation, request_id : Integer; error_code : Integer; error_text : AnsiString);
+
+    // Skybuck: moved to here to offer access to UNetData
+    Function DoSendAndWaitForResponse(operation: Word; RequestId: Integer; SendDataBuffer, ReceiveDataBuffer: TStream; MaxWaitTime : Cardinal; var HeaderData : TNetHeaderData) : Boolean;
+    Procedure DisconnectInvalidClient(ItsMyself : Boolean; Const why : AnsiString);
+
 
     Function ConnectTo(ServerIP: String; ServerPort:Word) : Boolean;
     Property Connected : Boolean read GetConnected write SetConnected;
@@ -87,17 +90,23 @@ type
 
     // Skybuck: added to offer access for NetData
     Property DoFinalizeConnection : boolean read FDoFinalizeConnection;
-//    Property NetLock : TPCCriticalSection read FNetLock;
+//    Property NetLock : TPCCriticalSection read FNetLock; // Skybuck: *** problem *** FNetLock must be passed as a variable to some try lock function thus cannot use property, maybe if it's not a var may it work, there is probably no reason for it to be a var parameter, thus it's probably a design error, not sure yet though, documented it in UThread.pas see there for further reference.
+    Property ClientPublicKey : TAccountKey read FClientPublicKey;
+    Property TcpIpClient : TNetTcpIpClient read FTcpIpClient;
+    Property HasReceivedData : Boolean read FHasReceivedData;
+
+    // Skybuck: added property to offer access to UThreadGetNewBlockChainFromClient
+    property RemoteAccumulatedWork : UInt64 read FRemoteAccumulatedWork;
+    property IsDownloadingBlocks : boolean read FIsDownloadingBlocks;
 
     Procedure FinalizeConnection;
-
 
   End;
 
 implementation
 
 uses
-  SysUtils, ULog, UNodeServerAddress, UConst, UNetData;
+  SysUtils, ULog, UNodeServerAddress, UConst, UNetData, UTime, UECDSA_Public, UPtrInt, UNetServerClient;
 
 { TNetConnection }
 
@@ -198,7 +207,7 @@ begin
   FRemoteOperationBlock := CT_OperationBlock_NUL;
   FRemoteAccumulatedWork := 0;
   SetClient( TBufferedNetTcpIpClient.Create(Self) );
-  TNetData.NetData.FNetConnections.Add(Self);
+  TNetData.NetData.NetConnections.Add(Self);
   TNetData.NetData.NotifyNetConnectionUpdated;
   FBufferLock := TPCCriticalSection.Create('TNetConnection_BufferLock');
   FBufferReceivedOperationsHash := TOrderedRawList.Create;
@@ -215,7 +224,7 @@ begin
 
     TNetData.NetData.NodeServersAddresses.DeleteNetConnection(Self);
   Finally
-    TNetData.NetData.FNetConnections.Remove(Self);
+    TNetData.NetData.NetConnections.Remove(Self);
   End;
   TNetData.NetData.UnRegisterRequest(Self,0,0);
   Try

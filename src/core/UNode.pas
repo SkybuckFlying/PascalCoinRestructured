@@ -31,7 +31,7 @@ interface
 
 uses
   Classes, UBlockChain, UNetProtocol, UAccounts, UCrypto, UThread, SyncObjs, ULog, UNetServer, UPCBank, UPCOperationsComp, UPCBankNotify, UOrderedRawList, UNodeServerAddress,
-  UNetConnection, UBlockAccount, UOperationsHashTree, UPCOperation, UOperationResume, UOrderedAccountKeysList;
+  UNetConnection, UBlockAccount, UOperationsHashTree, UPCOperation, UOperationResume, UOrderedAccountKeysList, UOperationsResumeList;
 
 {$I config.inc}
 

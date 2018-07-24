@@ -94,8 +94,6 @@ Type
 
 
 
-var
-  CT_SafeBoxChunkIdentificator : string = 'SafeBoxChunk';
 
 
 implementation

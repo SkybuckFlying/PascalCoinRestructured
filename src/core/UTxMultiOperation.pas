@@ -152,7 +152,7 @@ Type
 
 implementation
 
-Uses ULog, UConst, UAccountComp, UStreamOp, UAccount, UPCSafeBox;
+Uses ULog, UConst, UAccountComp, UStreamOp, UAccount, UPCSafeBox, UECDSA_Public;
 
 { TOpMultiOperation }
 

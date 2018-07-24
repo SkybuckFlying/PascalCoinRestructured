@@ -3,42 +3,64 @@ unit UNetClient;
 interface
 
 uses
-  UNetConnection, UNetClientThread;
+  UNetConnection, UThread, Classes;
 
 type
   TNetClient = Class(TNetConnection)
   private
-    FNetClientThread : TNetClientThread;
-    Procedure OnNetClientThreadTerminated(Sender : TObject);
+    FThread : TPCCustomThread;
+
+  protected
+    procedure Thread( Sender : TObject );
   public
     Constructor Create(AOwner : TComponent); override;
     Destructor Destroy; override;
+
+    procedure OnTerminated(Sender: TObject);
   End;
 
 implementation
+
+uses
+  ULog, SysUtils, UNetData;
 
 { TNetClient }
 
 constructor TNetClient.Create(AOwner: TComponent);
 begin
   inherited;
-  FNetClientThread := TNetClientThread.Create(Self,OnNetClientThreadTerminated);
-  FNetClientThread.FreeOnTerminate := false;
+  FThread := TPCCustomThread.Create(Thread);
+  FThread.OnTerminate := OnTerminated;
+  FThread.FreeOnTerminate := false;
 end;
 
 destructor TNetClient.Destroy;
 begin
   TLog.NewLog(ltdebug,Classname,'Starting TNetClient.Destroy');
-  FNetClientThread.OnTerminate := Nil;
-  if Not FNetClientThread.Terminated then begin
-    FNetClientThread.Terminate;
-    FNetClientThread.WaitFor;
+  FThread.OnTerminate := Nil;
+  if Not FThread.Terminated then begin
+    FThread.Terminate;
+    FThread.WaitFor;
   end;
-  FreeAndNil(FNetClientThread);
+  FreeAndNil(FThread);
   inherited;
 end;
 
-procedure TNetClient.OnNetClientThreadTerminated(Sender: TObject);
+procedure TNetClient.Thread( Sender : TObject );
+begin
+  while (Not FThread.Terminated) do begin
+    If Connected then begin
+      DoProcessBuffer;
+    end;
+    Sleep(1);
+  end;
+  // Close connection
+  if TNetData.NetData.ConnectionExistsAndActive(Self) then begin
+    Connected := false;
+  end;
+end;
+
+procedure TNetClient.OnTerminated(Sender: TObject);
 begin
   // Close connection
   if TNetData.NetData.ConnectionExistsAndActive(Self) then begin

@@ -20,7 +20,7 @@ type
 implementation
 
 uses
-  UCrypto, ULog, SysUtils;
+  ULog, SysUtils, UECDSA_Public;
 
 { TStreamOp }
 
