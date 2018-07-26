@@ -88,7 +88,7 @@ type
 
 implementation
 
-uses UConst, UAccounts, ULog, UCrypto, UFolderHelper, USettings;
+uses UConst, UAccounts, ULog, UCrypto, UFolderHelper, USettings, UAccountComp, UPtrInt;
 
 {$IFnDEF FPC}
   {$R *.dfm}

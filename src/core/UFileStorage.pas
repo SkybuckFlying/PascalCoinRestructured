@@ -20,7 +20,9 @@ unit UFileStorage;
 interface
 
 uses
-  Classes, {$IFnDEF FPC}Windows,{$ENDIF} UBlockChain, SyncObjs, UThread, UAccounts, UCrypto;
+  Classes, {$IFnDEF FPC}Windows,{$ENDIF} UBlockChain, SyncObjs, UThread, UAccounts, UCrypto, UStorage, UPCOperationsComp, UOrphan,
+  UPCSafeBoxHeader, UOperationsHashTree;
+
 {$I config.inc}
 
 Type
@@ -400,7 +402,9 @@ begin
       if Not assigned(db) then begin
         db := TFileStorage.Create(Nil);
         db.DatabaseFolder := Self.DatabaseFolder;
+        {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
         db.Bank := Self.Bank;
+        {$ENDIF}
         db.Orphan := DestOrphan;
         db.FStreamFirstBlockNumber := Start_Block;
       end;
@@ -480,9 +484,11 @@ begin
           ms.CopyFrom(fs,0);
           fs.Position := 0;
           ms.Position := 0;
+          {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
           if not Bank.LoadBankFromStream(ms,False,errors) then begin
             TLog.NewLog(lterror,ClassName,'Error reading bank from file: '+filename+ ' Error: '+errors);
           end;
+          {$ENDIF}
         Finally
           ms.Free;
         End;
@@ -501,6 +507,7 @@ var fs: TFileStream;
     ms : TMemoryStream;
 begin
   Result := true;
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   bankfilename := GetSafeboxCheckpointingFileName(GetFolder(Orphan),Bank.BlocksCount);
   if (bankfilename<>'') then begin
     TLog.NewLog(ltInfo,ClassName,'Saving Safebox blocks:'+IntToStr(Bank.BlocksCount)+' file:'+bankfilename);
@@ -535,6 +542,7 @@ begin
       end;
     end;
   end;
+  {$ENDIF}
 end;
 
 function TFileStorage.DoSaveBlockChain(Operations: TPCOperationsComp): Boolean;
@@ -558,7 +566,9 @@ begin
   Finally
     UnlockBlockChainStream;
   End;
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   if Assigned(Bank) then SaveBank;
+  {$ENDIF}
 end;
 
 Const CT_SafeboxsToStore = 10;
@@ -692,7 +702,9 @@ begin
   fs := TFileStream.Create(Filename,fmOpenRead);
   try
     fs.Position:=0;
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     Result := Bank.SafeBox.LoadSafeBoxStreamHeader(fs,safeBoxHeader);
+    {$ENDIF}
   finally
     fs.Free;
   end;

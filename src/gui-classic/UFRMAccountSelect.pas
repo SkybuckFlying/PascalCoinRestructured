@@ -27,7 +27,7 @@ uses
 {$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, UAccounts, Grids, StdCtrls, Buttons, ExtCtrls, UWallet, UNode,
-  UGridUtils, UConst, UThread;
+  UGridUtils, UConst, UThread, UPCSafeBox, UAccountKey, UCardinalsArray, UOrderedAccountList;
 
 const
   CT_AS_MyAccounts = $0001;
@@ -139,7 +139,7 @@ implementation
   {$R *.lfm}
 {$ENDIF}
 
-Uses strutils, UFRMMemoText;
+Uses strutils, UFRMMemoText, UAccount, UAccountComp, UAccountInfo, UPtrInt, UOrderedCardinalList;
 
 { TSearchThread }
 

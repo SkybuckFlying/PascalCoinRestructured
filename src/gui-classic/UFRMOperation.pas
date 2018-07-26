@@ -28,7 +28,7 @@ uses
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, UNode, UWallet, UCrypto, Buttons, UBlockChain,
   UAccounts, UFRMAccountSelect, ActnList, ComCtrls, Types, UFRMMemoText,
-  System.Actions;
+  System.Actions, UOrderedCardinalList, UAccount, UAccountKey;
 
 Const
   CM_PC_WalletKeysChanged = WM_USER + 1;
@@ -178,7 +178,8 @@ type
 implementation
 
 uses
-  UECIES, UConst, UOpTransaction, UFRMNewPrivateKeyType, UAES, UFRMWalletKeys;
+  UECIES, UConst, UOpTransaction, UFRMNewPrivateKeyType, UAES, UFRMWalletKeys, UOperationsHashTree, UPCOperation, UECDSA_Public, UCardinalsArray, UAccountComp,
+  UPtrInt, UPCSafeBox;
 
 {$IFnDEF FPC}
   {$R *.dfm}

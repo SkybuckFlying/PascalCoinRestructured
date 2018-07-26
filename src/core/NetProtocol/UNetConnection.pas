@@ -106,7 +106,8 @@ type
 implementation
 
 uses
-  SysUtils, ULog, UNodeServerAddress, UConst, UNetData, UTime, UECDSA_Public, UPtrInt, UNetServerClient;
+  SysUtils, ULog, UNodeServerAddress, UConst, UNetData, UTime, UECDSA_Public, UPtrInt, UNetServerClient, UPlatform, UPCOperationClass, UPCOperation, UNode, UNetProtocolConst,
+  UBlockAccount, URawBytes, UPCSafeBoxHeader, UStreamOp, UPCSafeBox, UCrypto, UPCChunk, UAccount, UAccountComp, UThreadGetNewBlockChainFromClient, UECIES, UNetClient;
 
 { TNetConnection }
 
@@ -477,6 +478,7 @@ begin
     errors := 'Invalid structure';
     op := TPCOperationsComp.Create(nil);
     Try
+      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
       op.bank := TNode.Node.Bank;
       if DataBuffer.Size-DataBuffer.Position<4 then begin
         DisconnectInvalidClient(false,'DoProcess_GetBlocks_Response invalid format: '+errors);
@@ -515,6 +517,7 @@ begin
         DoProcess_GetPendingOperations;
       end;
       TNode.Node.NotifyBlocksChanged;
+      {$ENDIF}
     Finally
       op.Free;
     End;
@@ -965,7 +968,7 @@ Begin
     if (connection_has_a_server>0) And (Not SameText(Client.RemoteHost,'localhost')) And (Not SameText(Client.RemoteHost,'127.0.0.1'))
       And (Not SameText('192.168.',Copy(Client.RemoteHost,1,8)))
       And (Not SameText('10.',Copy(Client.RemoteHost,1,3)))
-      And (Not TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.FNodePrivateKey.PublicKey)) then begin
+      And (Not TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.NodePrivateKey.PublicKey)) then begin
       nsa := CT_TNodeServerAddress_NUL;
       nsa.ip := Client.RemoteHost;
       nsa.port := connection_has_a_server;
@@ -995,8 +998,8 @@ Begin
         end;
         //
         if (FRemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) Or
-          ((FRemoteAccumulatedWork=0) And (TNetData.NetData.FMaxRemoteOperationBlock.block<FRemoteOperationBlock.block)) then begin
-          TNetData.NetData.FMaxRemoteOperationBlock := FRemoteOperationBlock;
+          ((FRemoteAccumulatedWork=0) And (TNetData.NetData.MaxRemoteOperationBlock.block<FRemoteOperationBlock.block)) then begin
+          TNetData.NetData.MaxRemoteOperationBlock := FRemoteOperationBlock;
           if TPCThread.ThreadClassFound(TThreadGetNewBlockChainFromClient,nil)<0 then begin
             TThreadGetNewBlockChainFromClient.Create;
           end;
@@ -1016,7 +1019,7 @@ Begin
           Send_Hello(ntp_request,TNetData.NetData.NewRequestId);
         end;
 
-        if (TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.FNodePrivateKey.PublicKey)) then begin
+        if (TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.NodePrivateKey.PublicKey)) then begin
           DisconnectInvalidClient(true,'MySelf disconnecting...');
           exit;
         end;
@@ -1058,7 +1061,7 @@ begin
       errors := 'Invalid message data';
       exit;
     end;
-    If Not ECIESDecrypt(TNetData.NetData.FNodePrivateKey.EC_OpenSSL_NID,TNetData.NetData.FNodePrivateKey.PrivateKey,false,messagecrypted,decrypted) then begin
+    If Not ECIESDecrypt(TNetData.NetData.NodePrivateKey.EC_OpenSSL_NID,TNetData.NetData.NodePrivateKey.PrivateKey,false,messagecrypted,decrypted) then begin
       errors := 'Error on decrypting message';
       exit;
     end;
@@ -1097,6 +1100,7 @@ begin
     end;
     op := TPCOperationsComp.Create(nil);
     try
+      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
       op.bank := TNode.Node.Bank;
       if Not op.LoadBlockFromStream(DataBuffer,errors) then begin
         errors := 'Error decoding new account: '+errors;
@@ -1138,6 +1142,7 @@ begin
           end;
         end;
       end;
+      {$ENDIF}
     finally
       op.Free;
     end;
@@ -1623,7 +1628,7 @@ begin
     // Save active server port (2 bytes). 0 = No active server port
     data.Write(w,2);
     // Save My connection public key
-    TStreamOp.WriteAnsiString(data,TAccountComp.AccountKey2RawString(TNetData.NetData.FNodePrivateKey.PublicKey));
+    TStreamOp.WriteAnsiString(data,TAccountComp.AccountKey2RawString(TNetData.NetData.NodePrivateKey.PublicKey));
     // Save my Unix timestamp (4 bytes)
     currunixtimestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
     data.Write(currunixtimestamp,4);

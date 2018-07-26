@@ -21,7 +21,7 @@ interface
 
 Uses UThread, ULog, UConst, UNode, UAccounts, UCrypto, UBlockChain,
   UNetProtocol, UOpTransaction, UWallet, UTime, UAES, UECIES, UTxMultiOperation,
-  UJSONFunctions, classes, blcksock, synsock, IniFiles, Variants, math, UOpenSSL;
+  UJSONFunctions, classes, blcksock, synsock, IniFiles, Variants, math, UOpenSSL, UOperationsHashTree, UAccount, UOperationResume, UAccountKey;
 
 Const
   CT_RPC_ErrNum_InternalError = 100;
@@ -120,7 +120,9 @@ Type
 implementation
 
 Uses  {$IFNDEF FPC}windows,{$ENDIF}
-  SysUtils, Synautil;
+  SysUtils, Synautil, UPCOperationsComp, UOperationBlock, UAccountComp, UOpChangeAccountInfoType, UAccountState, UTickCount, UPlatform, UPCOperation, UOperationsResumeList,
+  UPtrInt, UNetConnection, UNetData, UNetServerClient, UECDSA_Public, UOrderedCardinalList, UECPrivateKey, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo,
+  UNodeServerAddress;
 
 var _RPCServer : TRPCServer = Nil;
 
@@ -213,21 +215,21 @@ Begin
       auxObj := jsonArr.GetAsObject(jsonArr.Count);
       auxObj.GetAsVariant('account').Value := OPR.Changers[i].Account;
       if (OPR.Changers[i].N_Operation>0) then auxObj.GetAsVariant('n_operation').Value := OPR.Changers[i].N_Operation;
-      If (public_key in OPR.Changers[i].Changes_type) then begin
+      If (ait_public_key in OPR.Changers[i].Changes_type) then begin
         auxObj.GetAsVariant('new_enc_pubkey').Value := TCrypto.ToHexaString(TAccountComp.AccountKey2RawString(OPR.Changers[i].New_Accountkey));
       end;
-      If account_name in OPR.Changers[i].Changes_type then begin
+      If ait_account_name in OPR.Changers[i].Changes_type then begin
         auxObj.GetAsVariant('new_name').Value := OPR.Changers[i].New_Name;
       end;
-      If account_type in OPR.Changers[i].Changes_type then begin
+      If ait_account_type in OPR.Changers[i].Changes_type then begin
         auxObj.GetAsVariant('new_type').Value := OPR.Changers[i].New_Type;
       end;
-      if (list_for_public_sale in OPR.Changers[i].Changes_type)
-        Or (list_for_private_sale in OPR.Changers[i].Changes_type) then begin
+      if (ait_list_for_public_sale in OPR.Changers[i].Changes_type)
+        Or (ait_list_for_private_sale in OPR.Changers[i].Changes_type) then begin
         auxObj.GetAsVariant('seller_account').Value := OPR.Changers[i].Seller_Account;
         auxObj.GetAsVariant('account_price').Value := ToJSONCurrency(OPR.Changers[i].Account_Price);
       end;
-      if (list_for_private_sale in OPR.Changers[i].Changes_type) then begin
+      if (ait_list_for_private_sale in OPR.Changers[i].Changes_type) then begin
         auxObj.GetAsVariant('locked_until_block').Value := OPR.Changers[i].Locked_Until_Block;
         auxObj.GetAsVariant('new_enc_pubkey').Value := TCrypto.ToHexaString(TAccountComp.AccountKey2RawString(OPR.Changers[i].New_Accountkey));
       end;
@@ -338,13 +340,13 @@ begin
     auxObj := jsonArr.GetAsObject(jsonArr.Count);
     auxObj.GetAsVariant('account').Value := multiOperation.Data.changesInfo[i].Account;
     auxObj.GetAsVariant('n_operation').Value := multiOperation.Data.changesInfo[i].N_Operation;
-    If public_key in multiOperation.Data.changesInfo[i].Changes_type then begin
+    If ait_public_key in multiOperation.Data.changesInfo[i].Changes_type then begin
       auxObj.GetAsVariant('new_enc_pubkey').Value := TCrypto.ToHexaString(TAccountComp.AccountKey2RawString(multiOperation.Data.changesInfo[i].New_Accountkey));
     end;
-    If account_name in multiOperation.Data.changesInfo[i].Changes_type then begin
+    If ait_account_name in multiOperation.Data.changesInfo[i].Changes_type then begin
       auxObj.GetAsVariant('new_name').Value := multiOperation.Data.changesInfo[i].New_Name;
     end;
-    If account_type in multiOperation.Data.changesInfo[i].Changes_type then begin
+    If ait_account_type in multiOperation.Data.changesInfo[i].Changes_type then begin
       auxObj.GetAsVariant('new_type').Value := multiOperation.Data.changesInfo[i].New_Type;
     end;
   end;
@@ -2409,18 +2411,18 @@ function TRPCProcess.ProcessMethod(const method: String; params: TPCJSONObject;
         if (changeinfo.N_Operation<=0) then changeinfo.N_Operation:=Capture_Current_Account(changeinfo.Account).n_operation+1;
 
         if (jsonArr.GetAsObject(i).IndexOfName('new_b58_pubkey')>=0) or (jsonArr.GetAsObject(i).IndexOfName('new_enc_pubkey')>=0) then begin
-          changeinfo.Changes_type:=changeinfo.Changes_type + [public_key];
+          changeinfo.Changes_type:=changeinfo.Changes_type + [ait_public_key];
           If Not CapturePubKeyExt(jsonArr.GetAsObject(i),'new_',changeinfo.New_Accountkey,ErrorDesc) then begin
             ErrorNum := CT_RPC_ErrNum_InvalidPubKey;
             Exit;
           end;
         end;
         if (jsonArr.GetAsObject(i).IndexOfName('new_name')>=0) then begin
-          changeinfo.Changes_type:=changeinfo.Changes_type + [account_name];
+          changeinfo.Changes_type:=changeinfo.Changes_type + [ait_account_name];
           changeinfo.New_Name:=jsonArr.GetAsObject(i).AsString('new_name','');
         end;
         if (jsonArr.GetAsObject(i).IndexOfName('new_type')>=0) then begin
-          changeinfo.Changes_type:=changeinfo.Changes_type + [account_type];
+          changeinfo.Changes_type:=changeinfo.Changes_type + [ait_account_type];
           changeinfo.New_Type:=jsonArr.GetAsObject(i).AsInteger('new_type',0);
         end;
         if (changeinfo.Changes_type = []) then begin

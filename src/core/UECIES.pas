@@ -41,7 +41,7 @@ unit UECIES;
 
 interface
 
-Uses UOpenSSLdef, UOpenSSL, UCrypto, ULog, UConst;
+Uses UOpenSSLdef, UOpenSSL, UCrypto, ULog, UConst, UECDSA_Public;
 
 Const CT_Max_Bytes_To_Encrypt = 32000;
 
@@ -57,7 +57,7 @@ uses
 {$IFnDEF FPC}
   Windows,
 {$ENDIF}
-  SysUtils, UAES;
+  SysUtils, UAES, UPtrInt;
 
 Type
   Psecure_t = Pointer;

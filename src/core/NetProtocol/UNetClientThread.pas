@@ -2,8 +2,9 @@ unit UNetClientThread;
 
 interface
 
+{
 uses
-  UThread, UNetClient;  // problem, circular unit reference 7, performing git commit.
+  UThread, UNetClient, Classes;  // problem, circular unit reference 7, performing git commit.
 
 type
   TNetClientThread = Class(TPCThread)
@@ -14,7 +15,7 @@ type
   public
     Constructor Create(NetClient : TNetClient; AOnTerminateThread : TNotifyEvent);
   End;
-
+}
 
 implementation
 

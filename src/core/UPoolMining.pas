@@ -26,7 +26,7 @@ Uses
   {LCLIntf, LCLType, LMessages,}
 {$ENDIF}
   UTCPIP, SysUtils, UThread, SyncObjs, Classes, UJSONFunctions, UAES, UNode,
-  UCrypto, UAccounts, UConst, UBlockChain;
+  UCrypto, UAccounts, UConst, UBlockChain, UAccountKey, UPCOperationsComp;
 
 Const
   CT_PoolMining_Method_STATUS = 'status';
@@ -164,7 +164,9 @@ var
 
 implementation
 
-Uses ULog, Variants, UTime, UNetProtocol;
+Uses
+  ULog, Variants, UTime, UNetProtocol, UTickCount, UPlatform, UOperationBlock, UNetData, UECDSA_Public, UAccountComp, UOperationsHashTree, UPCOperation, UBlockAccount,
+  UPascalCoinProtocol;
 
 Type TPendingResponseMessage = Record
        sendDateTime : TDateTime;
@@ -818,7 +820,9 @@ begin
           if (P^.OperationsComp.OperationBlock.proof_of_work<=_targetPoW) then begin
             // Candidate!
             nbOperations := TPCOperationsComp.Create(Nil);
+            {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
             nbOperations.bank := FNodeNotifyEvents.Node.Bank;
+            {$ENDIF}
             nbOperations.CopyFrom(P^.OperationsComp);
             nbOperations.AccountKey := MinerAccountKey;
             TLog.NewLog(ltInfo,ClassName,sJobInfo+' - Found a solution for block '+IntToStr(nbOperations.OperationBlock.block));

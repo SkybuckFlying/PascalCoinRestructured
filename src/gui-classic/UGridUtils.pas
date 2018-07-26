@@ -28,7 +28,7 @@ uses
   LCLIntf, LCLType, LMessages,
 {$ENDIF}
   Classes, Grids, UNode, UAccounts, UBlockChain, UAppParams,
-  UWallet, UCrypto, UPoolMining, URPC;
+  UWallet, UCrypto, UPoolMining, URPC, UOrderedCardinalList, UOperationsResumeList, UOperationResume;
 
 Type
   // TAccountsGrid implements a visual integration of TDrawGrid
@@ -200,7 +200,7 @@ implementation
 
 uses
   Graphics, SysUtils, UTime, UOpTransaction, UConst,
-  UFRMPayloadDecoder, ULog;
+  UFRMPayloadDecoder, ULog, UAccount, UAccountComp, UPtrInt, UPCOperation, UPCOperationsComp, UOperationBlock, UBigNum;
 
 { TAccountsGrid }
 
@@ -918,6 +918,7 @@ begin
       if AccountNumber<0 then begin
         opc := TPCOperationsComp.Create(Nil);
         try
+          {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
           opc.bank := Node.Bank;
           If FBlockEnd<0 then begin
             If Node.Bank.BlocksCount>0 then bend := Node.Bank.BlocksCount-1
@@ -955,6 +956,7 @@ begin
             end else break;
             bend := bend - 1;
           end;
+          {$ENDIF}
         finally
           opc.Free;
         end;
@@ -1307,6 +1309,7 @@ begin
     SetLength(FBlockChainDataArray,nend - nstart +1);
     opc := TPCOperationsComp.Create(Nil);
     try
+      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
       opc.bank := Node.Bank;
       while (nstart<=nend) do begin
         i := length(FBlockChainDataArray) - (nend-nstart+1);
@@ -1344,6 +1347,7 @@ begin
         FBlockChainDataArray[i] := bcd;
         if (nend>0) then dec(nend) else break;
       end;
+      {$ENDIF}
     finally
       opc.Free;
     end;

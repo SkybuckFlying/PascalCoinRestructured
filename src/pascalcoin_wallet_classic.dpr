@@ -51,7 +51,7 @@ uses
   synautil in 'libraries\synapse\synautil.pas',
   synacode in 'libraries\synapse\synacode.pas',
   synaip in 'libraries\synapse\synaip.pas',
-  UChunk in 'core\UChunk.pas',
+  UPCChunk in 'core\UPCChunk.pas',
   UGridUtils in 'gui-classic\UGridUtils.pas',
   UFRMMemoText in 'gui-classic\UFRMMemoText.pas' {FRMMemoText},
   UFRMAccountSelect in 'gui-classic\UFRMAccountSelect.pas' {FRMAccountSelect},
@@ -136,7 +136,8 @@ uses
   UECDSA_Public in 'core\Crypto\UECDSA_Public.pas',
   UCryptoException in 'core\Crypto\UCryptoException.pas',
   UNotifyEventToMany in 'core\BaseTypes\UNotifyEventToMany.pas',
-  UCustomThread in 'core\Thread\UCustomThread.pas';
+  UCustomThread in 'core\Thread\UCustomThread.pas',
+  UOperationsResumeList in 'core\Lists\UOperationsResumeList.pas';
 
 {$R *.res}
 

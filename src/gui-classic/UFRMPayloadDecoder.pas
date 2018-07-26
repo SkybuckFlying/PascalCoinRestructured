@@ -27,7 +27,7 @@ uses
 {$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, UBlockChain, UCrypto, UWallet, Buttons, ComCtrls,
-  UAppParams;
+  UAppParams, UOperationResume;
 
 type
 
@@ -103,7 +103,7 @@ implementation
   {$R *.lfm}
 {$ENDIF}
 
-Uses UNode, UTime, UECIES, UAES, UAccounts, UFRMMemoText;
+Uses UNode, UTime, UECIES, UAES, UAccounts, UFRMMemoText, UPCOperationsComp, UPCOperation, UAccountComp;
 
 { TFRMPayloadDecoder }
 

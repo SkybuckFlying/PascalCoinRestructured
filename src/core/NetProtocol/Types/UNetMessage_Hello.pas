@@ -3,8 +3,7 @@ unit UNetMessage_Hello;
 interface
 
 uses
-  UOperationBlock;
-  UNodeServerAddress;
+  UOperationBlock, UNodeServerAddress;
 
 type
   TNetMessage_Hello = Record

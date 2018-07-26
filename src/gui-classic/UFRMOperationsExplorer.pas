@@ -30,7 +30,7 @@ uses
   Classes, SysUtils, Forms, Controls, Graphics, Dialogs, StdCtrls, ExtCtrls,
   Menus, ActnList, UAccounts, UBlockChain, UNode, UCrypto,
   UFileStorage, UWallet, UConst, UTxMultiOperation, UOpTransaction, URPC, UJSONFunctions,
-  System.Actions;
+  System.Actions, UOperationsHashTree, UStorage, UPCOperation;
 
 
 type
@@ -132,7 +132,8 @@ Uses
 {$IFDEF TESTNET}
    UFRMRandomOperations,
 {$ENDIF}
-   UFRMRPCCalls;
+   UFRMRPCCalls, UMultiOpSender, UMultiOpReceiver, UAccountComp, UMultiOpChangeInfo, UAccountKey, UECDSA_Public, UPCSafeBox,
+   UOpChangeAccountInfoType, UPCOperationsComp, UOperationResume, UPtrInt;
 
 
 { TFRMOperationsExplorer }
@@ -428,11 +429,11 @@ LBL_start_changer:
     SetLength(changes,length(changes)+1);
     changes[high(changes)] := CT_TMultiOpChangeInfo_NUL;
     changes[high(changes)].Account:=nAccount;
-    changes[high(changes)].Changes_type:=[account_name,account_type];
+    changes[high(changes)].Changes_type:=[ait_account_name,ait_account_type];
     changes[high(changes)].New_Name:=new_name;
     changes[high(changes)].New_Type:=new_type;
     If new_account_key.EC_OpenSSL_NID<>CT_TECDSA_Public_Nul.EC_OpenSSL_NID then begin
-      changes[high(changes)].Changes_type:=changes[high(changes)].Changes_type + [public_key];
+      changes[high(changes)].Changes_type:=changes[high(changes)].Changes_type + [ait_public_key];
       changes[high(changes)].New_Accountkey := new_account_key;
     end;
     changes[high(changes)].N_Operation:=n_operation;

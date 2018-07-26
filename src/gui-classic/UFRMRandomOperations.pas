@@ -29,7 +29,7 @@ uses
   {$ENDIF}
   Classes, SysUtils,  Forms, Controls, Graphics, Dialogs, StdCtrls,
   ExtCtrls, Menus, ActnList, UAccounts, UBlockChain, UNode, UCrypto,
-  UWallet, UConst, UTxMultiOperation, UOpTransaction;
+  UWallet, UConst, UTxMultiOperation, UOpTransaction, UPCBankNotify, UPCOperationsComp;
 
 type
 
@@ -82,6 +82,9 @@ implementation
 {$ELSE}
   {$R *.lfm}
 {$ENDIF}
+
+uses
+  UOrderedCardinalList, UAccount, UAccountComp, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UOpChangeAccountInfoType;
 
 { TRandomGenerateOperation }
 
@@ -153,6 +156,7 @@ class function TRandomGenerateOperation.GenerateOpMultiOperation(const operation
      i,j : Integer;
    begin
      n := 0;
+     {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
      For i:=0 to High(opMulti.Data.txSenders) do begin
        j := aWalletKeys.IndexOfAccountKey(operationsComp.bank.SafeBox.Account(opMulti.Data.txSenders[i].Account).accountInfo.accountKey);
        If (j>=0) then begin
@@ -171,6 +175,7 @@ class function TRandomGenerateOperation.GenerateOpMultiOperation(const operation
          end;
        end;
      end;
+     {$ENDIF}
    end;
 
 Var opMulti : TOpMultiOperation;
@@ -218,16 +223,16 @@ begin
             changer.N_Operation:=acc.n_operation+1;
             case Random(3) of // public_key,account_name,account_type
               0 : begin
-                changer.Changes_type:=[public_key];
+                changer.Changes_type:=[ait_public_key];
                 acc := operationsComp.SafeBoxTransaction.Account(Random(operationsComp.SafeBoxTransaction.FreezedSafeBox.AccountsCount));
                 changer.New_Accountkey := acc.accountInfo.accountKey;
               end;
               1 : begin
-                changer.Changes_type:=[account_name];
+                changer.Changes_type:=[ait_account_name];
                 changer.New_Name:='random'+IntToStr(Random(100)); // <- This will generate collisions
               end;
             else
-              changer.Changes_type:=[account_type];
+              changer.Changes_type:=[ait_account_type];
               changer.New_Type:=Random(65535);
             end;
             opMulti.AddChangeInfo(changer);
@@ -301,7 +306,9 @@ begin
   FSourceNode:=AValue;
   If Assigned(AValue) then begin
     FBankNotify.Bank := AValue.Bank;
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     FCurrOperationsComp.bank := AValue.Bank;
+    {$ENDIF}
   end;
 end;
 

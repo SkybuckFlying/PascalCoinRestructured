@@ -50,7 +50,6 @@ type
     procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     Procedure DiscoverServersTerminated(Sender : TObject);
   protected
-    procedure DoProcessReservedAreaMessage(senderConnection : TNetConnection; const headerData : TNetHeaderData; receivedData : TStream; responseData : TStream); virtual;
 
     procedure CheckConnectionsThread( Sender : TObject );
 
@@ -64,9 +63,14 @@ type
     // Skybuck: moved to here to offer access to UNetServer
     Procedure IncStatistics(incActiveConnections,incClientsConnections,incServersConnections,incServersConnectionsWithResponse : Integer; incBytesReceived, incBytesSend : Int64);
 
+    // Skybuck: moved to here to offer access to UNetConnection
+    procedure DoProcessReservedAreaMessage(senderConnection : TNetConnection; const headerData : TNetHeaderData; receivedData : TStream; responseData : TStream); virtual;
+
+
     Class function HeaderDataToText(const HeaderData : TNetHeaderData) : AnsiString;
     Class function ExtractHeaderInfo(buffer : TStream; var HeaderData : TNetHeaderData; DataBuffer : TStream; var IsValidHeaderButNeedMoreData : Boolean) : Boolean;
     Class Function OperationToText(operation : Word) : AnsiString;
+
     // Only 1 NetData
     Class Function NetData : TNetData;
     Class Function NetDataExists : Boolean;

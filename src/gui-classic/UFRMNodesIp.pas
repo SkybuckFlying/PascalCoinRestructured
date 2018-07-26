@@ -38,7 +38,7 @@ type
 implementation
 
 uses
-  UNetProtocol, UNode, UConst, USettings;
+  UNetProtocol, UNode, UConst, USettings, UNodeServerAddress, UNetData;
 
 {$IFnDEF FPC}
   {$R *.dfm}

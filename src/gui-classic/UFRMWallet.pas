@@ -31,7 +31,8 @@ uses
   ExtCtrls, ComCtrls, UWallet, StdCtrls, ULog, Grids, UAppParams, UBlockChain,
   UNode, UGridUtils, UJSONFunctions, UAccounts, Menus, ImgList, UNetProtocol,
   UCrypto, Buttons, UPoolMining, URPC, UFRMAccountSelect, UConst,
-  UFRMRPCCalls, UTxMultiOperation;
+  UFRMRPCCalls, UTxMultiOperation, UOperationResume, UOrderedAccountKeysList,
+  UNetConnection, UAccountKey;
 
 Const
   CM_PC_WalletKeysChanged = WM_USER + 1;
@@ -304,7 +305,8 @@ implementation
 Uses UFolderHelper, UOpenSSL, UOpenSSLdef, UTime, UFileStorage,
   UThread, UOpTransaction, UECIES, UFRMPascalCoinWalletConfig,
   UFRMOperationsExplorer,
-  UFRMAbout, UFRMOperation, UFRMWalletKeys, UFRMPayloadDecoder, UFRMNodesIp, UFRMMemoText, USettings;
+  UFRMAbout, UFRMOperation, UFRMWalletKeys, UFRMPayloadDecoder, UFRMNodesIp, UFRMMemoText, USettings, UNodeServerAddress, UNetData, UPtrInt,
+  UOrderedCardinalList, UNetServerClient, UAccountComp, UAccount, UECPrivateKey, UECDSA_Public, UNetStatistics;
 
 Type
   TThreadActivate = Class(TPCThread)

@@ -9,7 +9,7 @@ type
   { TPCOperationsComp }
   TPCOperationsComp = Class(TComponent)
   private
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     FBank: TPCBank;
     {$ENDIF}
     FSafeBoxTransaction : TPCSafeBoxTransaction;
@@ -24,7 +24,7 @@ type
     FOperationsLock : TPCCriticalSection;
     FPreviousUpdatedBlocks : TAccountPreviousBlockInfo; // New Protocol V3 struct to store previous updated blocks
     function GetOperation(index: Integer): TPCOperation;
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     procedure SetBank(const value: TPCBank);
     {$ENDIF}
     procedure SetnOnce(const value: Cardinal);
@@ -51,7 +51,7 @@ type
     Function AddOperation(Execute : Boolean; op: TPCOperation; var errors: AnsiString): Boolean;
     Function AddOperations(operations: TOperationsHashTree; var errors: AnsiString): Integer;
     Property Operation[index: Integer]: TPCOperation read GetOperation;
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     Property bank: TPCBank read FBank write SetBank;
     {$ENDIF}
     Procedure Clear(DeleteOperations : Boolean);
@@ -114,7 +114,7 @@ Begin
     errors := '';
     Result := False;
     if Execute then begin
-      {$IF DEFINED(CIRCULAR_REFERENCE)}
+      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
       if (FBank = Nil) then begin
         errors := 'No Bank';
         exit;
@@ -208,7 +208,7 @@ begin
 
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     if Assigned(FBank) then begin
       FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
       If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
@@ -278,7 +278,7 @@ begin
     FOperationBlock := Operations.FOperationBlock;
     FOperationBlock.account_key := lastopb.account_key; // Except AddressKey
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     FOperationBlock.compact_target := FBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
     {$ENDIF}
 
@@ -311,7 +311,7 @@ begin
   FOperationsHashTree := TOperationsHashTree.Create;
   FOperationsHashTree.OnChanged:= OnOperationsHashTreeChanged;
 
-  {$IF DEFINED(CIRCULAR_REFERENCE)}
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   FBank := Nil;
   {$ENDIF}
 
@@ -319,7 +319,7 @@ begin
   FSafeBoxTransaction := Nil;
   FPreviousUpdatedBlocks := TAccountPreviousBlockInfo.Create;
 
-  {$IF DEFINED(CIRCULAR_REFERENCE)}
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   if Assigned(AOwner) And (AOwner is TPCBank) then begin
     SetBank( TPCBank(AOwner) );
   end else Clear(true);
@@ -540,7 +540,7 @@ begin
   inherited;
   if (Operation = opRemove) then begin
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     if AComponent = FBank then begin
       FBank := Nil;
       FreeAndNil(FSafeBoxTransaction);
@@ -583,7 +583,7 @@ begin
   Try
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     if Assigned(FBank) then begin
       FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
       If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
@@ -769,7 +769,7 @@ begin
   end;
 end;
 
-{$IF DEFINED(CIRCULAR_REFERENCE)}
+{$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
 procedure TPCOperationsComp.SetBank(const value: TPCBank);
 begin
   if FBank = value then exit;
@@ -813,7 +813,7 @@ begin
   Try
     ts := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     if Assigned(FBank) then begin
       If FBank.FLastOperationBlock.timestamp>ts then ts := FBank.FLastOperationBlock.timestamp;
     end;

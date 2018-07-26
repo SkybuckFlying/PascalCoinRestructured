@@ -111,6 +111,10 @@ object FRMRPCCalls: TFRMRPCCalls
       TabOrder = 2
       object tsKeyNames: TTabSheet
         Caption = 'Key/Value Params'
+        ExplicitLeft = 0
+        ExplicitTop = 0
+        ExplicitWidth = 0
+        ExplicitHeight = 0
         object vlKeyParams: TValueListEditor
           Left = 0
           Top = 0
@@ -121,9 +125,6 @@ object FRMRPCCalls: TFRMRPCCalls
           Strings.Strings = (
             '')
           TabOrder = 0
-          ColWidths = (
-            64
-            211)
         end
       end
       object tsJSONParams: TTabSheet
@@ -151,7 +152,6 @@ object FRMRPCCalls: TFRMRPCCalls
       Anchors = [akLeft, akBottom]
       Caption = '&Send'
       Default = True
-      DoubleBuffered = True
       Glyph.Data = {
         36040000424D3604000000000000360000002800000010000000100000000100
         2000000000000004000064000000640000000000000000000000FFFFFF00FFFF
@@ -187,7 +187,6 @@ object FRMRPCCalls: TFRMRPCCalls
         FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFF
         FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFF
         FF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00FFFFFF00}
-      ParentDoubleBuffered = False
       TabOrder = 3
       OnClick = bbSendCommandClick
     end

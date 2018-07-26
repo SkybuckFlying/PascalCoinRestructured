@@ -11,12 +11,12 @@ type
   private
     FOrphan: TOrphan;
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     FBank : TPCBank;
     {$ENDIF}
 
     FReadOnly: Boolean;
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     procedure SetBank(const Value: TPCBank);
     {$ENDIF}
   protected
@@ -49,7 +49,7 @@ type
     Constructor Create(AOwner : TComponent); Override;
     Property Orphan : TOrphan read FOrphan write SetOrphan;
     Property ReadOnly : Boolean read FReadOnly write SetReadOnly;
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     Property Bank : TPCBank read FBank write SetBank;
     {$ENDIF}
     Procedure CopyConfiguration(Const CopyFrom : TStorage); virtual;
@@ -139,7 +139,7 @@ function TStorage.SaveBank: Boolean;
 begin
   Result := true;
   If FIsMovingBlockchain then Exit;
-  {$IF DEFINED(CIRCULAR_REFERENCE)}
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   if Not TPCSafeBox.MustSafeBoxBeSaved(Bank.BlocksCount) then exit; // No save
   Try
     Result := DoSaveBank;
@@ -166,7 +166,7 @@ begin
   End;
 end;
 
-{$IF DEFINED(CIRCULAR_REFERENCE)}
+{$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
 procedure TStorage.SetBank(const Value: TPCBank);
 begin
   FBank := Value;

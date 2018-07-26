@@ -340,7 +340,7 @@ begin
     if Not Assigned(FStorageClass) then raise Exception.Create('StorageClass not defined');
     FStorage := FStorageClass.Create(Self);
 
-    {$IF DEFINED(CIRCULAR_REFERENCE)}
+    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
     FStorage.Bank := Self;
     {$ENDIF}
   end;

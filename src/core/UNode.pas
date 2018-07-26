@@ -516,7 +516,7 @@ begin
   FBCBankNotify.OnNewBlock := OnBankNewBlock;
   FNetServer := TNetServer.Create;
   FOperations := TPCOperationsComp.Create(Self);
-  {$IF DEFINED(CIRCULAR_REFERENCE)}
+  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
   FOperations.bank := FBank;
   {$ENDIF}
 

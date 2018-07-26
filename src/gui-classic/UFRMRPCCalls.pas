@@ -80,6 +80,9 @@ Const
 
 implementation
 
+uses
+  UStreamOp;
+
 {$IFnDEF FPC}
   {$R *.dfm}
 {$ELSE}
