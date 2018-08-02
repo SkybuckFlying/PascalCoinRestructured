@@ -637,7 +637,7 @@ procedure TNetData.GetNewBlockChainFromClient(Connection: TNetConnection;
   const why: String);
 Const CT_LogSender = 'GetNewBlockChainFromClient';
 
-  function Do_GetOperationsBlock(AssignToBank : TPCBank; block_start,block_end, MaxWaitMilliseconds : Cardinal; OnlyOperationBlock : Boolean; BlocksList : TList) : Boolean;
+  function Do_GetOperationsBlock( block_start,block_end, MaxWaitMilliseconds : Cardinal; OnlyOperationBlock : Boolean; BlocksList : TList) : Boolean;
   Var SendData,ReceiveData : TMemoryStream;
     headerdata : TNetHeaderData;
     op : TPCOperationsComp;
@@ -667,7 +667,7 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
         i := 0; last_n_block := 0;
         while (i<opcount) do begin
           // decode data
-          op := TPCOperationsComp.Create(AssignToBank);
+          op := TPCOperationsComp.Create;
           If op.LoadBlockFromStream(ReceiveData,errors) then begin
             // Build 2.1.7 Protection for invalid block number
             If ((i>0) And (last_n_block>=op.OperationBlock.block)) Or
@@ -704,7 +704,7 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
     OperationBlock := CT_OperationBlock_NUL;
     BlocksList := TList.Create;
     try
-      Result := Do_GetOperationsBlock(TNode.Node.Bank,block,block,MaxWaitMilliseconds,True,BlocksList);
+      Result := Do_GetOperationsBlock(block,block,MaxWaitMilliseconds,True,BlocksList);
       // Build 2.1.7 - Included protection agains not good block received
       if (Result) And (BlocksList.Count=1) then begin
         OperationBlock := TPCOperationsComp(BlocksList[0]).OperationBlock;
@@ -731,7 +731,10 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
     repeat
       BlocksList := TList.Create;
       try
-        If Not Do_GetOperationsBlock(Nil,min,max,5000,true,BlocksList) then exit;
+        // *** OperationsComp PROBLEM ***
+        // Skybuck: *** Do_GetOperationsBlock MAY HAVE TO BE DONE DIFFERENT, currently it will be applied to PascalCoinBank Directly ! ***
+        If Not Do_GetOperationsBlock(min,max,5000,true,BlocksList) then exit;
+
         if (BlocksList.Count=0) then begin
           Connection.DisconnectInvalidClient(false,'No received info for blocks from '+inttostr(min)+' to '+inttostr(max));
           exit;
@@ -825,12 +828,19 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
       repeat
         BlocksList := TList.Create;
         try
-          finished := NOT Do_GetOperationsBlock(Bank,start,start + 50,30000,false,BlocksList);
+          // *** OperationsComp PROBLEM ***
+          // Skybuck: *** Do_GetOperationsBlock will have to be done different, currently it's applied to PascalCoinBank instead of Bank
+          finished := NOT Do_GetOperationsBlock(start,start + 50,30000,false,BlocksList);
+
+
           i := 0;
           while (i<BlocksList.Count) And (Not finished) do begin
             OpComp := TPCOperationsComp(BlocksList[i]);
             ms := TMemoryStream.Create;
-            OpExecute := TPCOperationsComp.Create(Bank);
+
+            // *** OperationsComp PROBLEM ***
+            // Skybuck: some more danger/bugs here, OpExecute applied to PascalCoinBank instead of Bank
+            OpExecute := TPCOperationsComp.Create;
             try
               OpComp.SaveBlockToStream(false,ms);
               ms.Position := 0;
@@ -877,7 +887,7 @@ Const CT_LogSender = 'GetNewBlockChainFromClient';
             TLog.NewLog(ltinfo,CT_LogSender,'New valid blockchain found. My block count='+inttostr(TNode.Node.Bank.BlocksCount)+' work: '+IntToStr(TNode.Node.Bank.SafeBox.WorkSum)+
               ' found count='+inttostr(Bank.BlocksCount)+' work: '+IntToStr(Bank.SafeBox.WorkSum)+' starting at block '+inttostr(start_block));
             if TNode.Node.Bank.BlocksCount>0 then begin
-              OpExecute := TPCOperationsComp.Create(Nil);
+              OpExecute := TPCOperationsComp.Create;
               try
                 for start:=start_c to TNode.Node.Bank.BlocksCount-1 do begin
                   If TNode.Node.Bank.LoadOperations(OpExecute,start) then begin

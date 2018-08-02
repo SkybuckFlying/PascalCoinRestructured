@@ -417,7 +417,8 @@ begin
 
      db := TMemoryStream.Create;
      try
-       op := TPCOperationsComp.Create(TNetData.NetData.bank);
+
+       op := TPCOperationsComp.Create;
        try
          c := b_end - b_start + 1;
          posquantity := db.position;
@@ -476,10 +477,8 @@ begin
     end;
     // DataBuffer contains: from and to
     errors := 'Invalid structure';
-    op := TPCOperationsComp.Create(nil);
+    op := TPCOperationsComp.Create;
     Try
-      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-      op.bank := TNode.Node.Bank;
       if DataBuffer.Size-DataBuffer.Position<4 then begin
         DisconnectInvalidClient(false,'DoProcess_GetBlocks_Response invalid format: '+errors);
         exit;
@@ -517,7 +516,6 @@ begin
         DoProcess_GetPendingOperations;
       end;
       TNode.Node.NotifyBlocksChanged;
-      {$ENDIF}
     Finally
       op.Free;
     End;
@@ -924,7 +922,7 @@ var op, myLastOp : TPCOperationsComp;
    lastTimestampDiff : Integer;
 Begin
   FRemoteAccumulatedWork := 0;
-  op := TPCOperationsComp.Create(Nil);
+  op := TPCOperationsComp.Create;
   try
     DataBuffer.Position:=0;
     if DataBuffer.Read(connection_has_a_server,2)<2 then begin
@@ -1098,10 +1096,8 @@ begin
       errors := 'Not autosend';
       exit;
     end;
-    op := TPCOperationsComp.Create(nil);
+    op := TPCOperationsComp.Create;
     try
-      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-      op.bank := TNode.Node.Bank;
       if Not op.LoadBlockFromStream(DataBuffer,errors) then begin
         errors := 'Error decoding new account: '+errors;
         exit;
@@ -1142,7 +1138,6 @@ begin
           end;
         end;
       end;
-      {$ENDIF}
     finally
       op.Free;
     end;

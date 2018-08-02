@@ -623,7 +623,7 @@ begin
   If Not InputQuery(Caption,s,aux) then Exit;
   i := StrToIntDef(aux,-1);
   If (i<AStorage.FirstBlock) Or (i>AStorage.LastBlock) then Raise Exception.Create(Format('Block %d does not exists',[i]));
-  opc := TPCOperationsComp.Create(Nil);
+  opc := TPCOperationsComp.Create;
   Try
     If Not AStorage.LoadBlockChainBlock(opc,i) then Raise Exception.Create(Format('Cannot load block %d',[i]));
     FOperationsHashTree.CopyFromHashTree(opc.OperationsHashTree);

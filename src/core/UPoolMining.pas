@@ -541,7 +541,7 @@ begin
         P^.SentMinTimestamp := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
       end;
       FillMinerOperations;
-      P^.OperationsComp := TPCOperationsComp.Create(Nil);
+      P^.OperationsComp := TPCOperationsComp.Create;
       P^.OperationsComp.CopyFrom(FMinerOperations);
       P^.OperationsComp.AccountKey := FMinerAccountKey;
       P^.OperationsComp.BlockPayload := FMinerPayload;
@@ -620,7 +620,7 @@ begin
   FNodeNotifyEvents.OnBlocksChanged := OnNodeNewBlock;
   FNodeNotifyEvents.OnOperationsChanged := OnNodeOperationsChanged;
   FNodeNotifyEvents.Node := TNode.Node;
-  FMinerOperations := TPCOperationsComp.Create(FNodeNotifyEvents.Node.Bank);
+  FMinerOperations := TPCOperationsComp.Create;
   FMinerAccountKey := CT_TECDSA_Public_Nul;
   FMinerPayload := '';
   FPoolJobs := TPCThreadList.Create('TPoolMiningServer_PoolJobs');
@@ -819,10 +819,7 @@ begin
           P^.OperationsComp.Update_And_RecalcPOW(_nOnce,_timestamp,_payload);
           if (P^.OperationsComp.OperationBlock.proof_of_work<=_targetPoW) then begin
             // Candidate!
-            nbOperations := TPCOperationsComp.Create(Nil);
-            {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-            nbOperations.bank := FNodeNotifyEvents.Node.Bank;
-            {$ENDIF}
+            nbOperations := TPCOperationsComp.Create;
             nbOperations.CopyFrom(P^.OperationsComp);
             nbOperations.AccountKey := MinerAccountKey;
             TLog.NewLog(ltInfo,ClassName,sJobInfo+' - Found a solution for block '+IntToStr(nbOperations.OperationBlock.block));
@@ -926,7 +923,7 @@ begin
           P^.SentMinTimestamp := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
         end;
         FillMinerOperations;
-        P^.OperationsComp := TPCOperationsComp.Create(Nil);
+        P^.OperationsComp := TPCOperationsComp.Create;
         P^.OperationsComp.CopyFrom(FMinerOperations);
         P^.OperationsComp.AccountKey := FMinerAccountKey;
         P^.OperationsComp.BlockPayload := FMinerPayload;

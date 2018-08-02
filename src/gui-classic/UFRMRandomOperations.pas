@@ -84,7 +84,7 @@ implementation
 {$ENDIF}
 
 uses
-  UOrderedCardinalList, UAccount, UAccountComp, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UOpChangeAccountInfoType;
+  UOrderedCardinalList, UAccount, UAccountComp, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UOpChangeAccountInfoType, UPCBank;
 
 { TRandomGenerateOperation }
 
@@ -155,27 +155,26 @@ class function TRandomGenerateOperation.GenerateOpMultiOperation(const operation
    var n : Integer;
      i,j : Integer;
    begin
+     // value N never used.
      n := 0;
-     {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
      For i:=0 to High(opMulti.Data.txSenders) do begin
-       j := aWalletKeys.IndexOfAccountKey(operationsComp.bank.SafeBox.Account(opMulti.Data.txSenders[i].Account).accountInfo.accountKey);
+       j := aWalletKeys.IndexOfAccountKey(PascalCoinBank.SafeBox.Account(opMulti.Data.txSenders[i].Account).accountInfo.accountKey);
        If (j>=0) then begin
          // Can sign
          If (Assigned(aWalletKeys.Key[j].PrivateKey)) then begin
-           inc(n, opMulti.DoSignMultiOperationSigner(opMulti.Data.txSenders[i].Account,aWalletKeys.Key[j].PrivateKey));
+           inc(n, opMulti.DoSignMultiOperationSigner(opMulti.Data.txSenders[i].Account,aWalletKeys.Key[j].PrivateKey));      // value N never used.
          end;
        end;
      end;
      For i:=0 to High(opMulti.Data.changesInfo) do begin
-       j := aWalletKeys.IndexOfAccountKey(operationsComp.bank.SafeBox.Account(opMulti.Data.changesInfo[i].Account).accountInfo.accountKey);
+       j := aWalletKeys.IndexOfAccountKey(PascalCoinBank.SafeBox.Account(opMulti.Data.changesInfo[i].Account).accountInfo.accountKey);
        If (j>=0) then begin
          // Can sign
          If (Assigned(aWalletKeys.Key[j].PrivateKey)) then begin
-           inc(n, opMulti.DoSignMultiOperationSigner(opMulti.Data.changesInfo[i].Account,aWalletKeys.Key[j].PrivateKey));
+           inc(n, opMulti.DoSignMultiOperationSigner(opMulti.Data.changesInfo[i].Account,aWalletKeys.Key[j].PrivateKey));      // value N never used.
          end;
        end;
      end;
-     {$ENDIF}
    end;
 
 Var opMulti : TOpMultiOperation;
@@ -264,7 +263,7 @@ begin
   FStopRandomOperations := True;
   FBankNotify := TPCBankNotify.Create(Nil);
   FBankNotify.OnNewBlock:=OnBankNewBlock;
-  FCurrOperationsComp := TPCOperationsComp.Create(Nil);
+  FCurrOperationsComp := TPCOperationsComp.Create;
   mLogs.Clear;
 end;
 
@@ -306,9 +305,6 @@ begin
   FSourceNode:=AValue;
   If Assigned(AValue) then begin
     FBankNotify.Bank := AValue.Bank;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    FCurrOperationsComp.bank := AValue.Bank;
-    {$ENDIF}
   end;
 end;
 

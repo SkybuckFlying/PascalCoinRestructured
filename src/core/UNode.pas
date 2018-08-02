@@ -164,11 +164,12 @@ Type
     destructor Destroy; override;
   End;
 
+var
+  PascalCoinNode : TNode;
+
 implementation
 
 Uses UOpTransaction, SysUtils,  UConst, UTime, UOperationBlock, UPtrInt, UNetData, UAccountComp, UPascalCoinProtocol, UAccount;
-
-var _Node : TNode;
 
 { TNode }
 
@@ -504,7 +505,7 @@ begin
   FNodeLog := TLog.Create(Self);
   FNodeLog.ProcessGlobalLogs := false;
 //  RegisterOperationsClass; // Skybuck: should not be needed
-  if Assigned(_Node) then raise Exception.Create('Duplicate nodes protection');
+  if Assigned(PascalCoinNode) then raise Exception.Create('Duplicate nodes protection');
   TLog.NewLog(ltInfo,ClassName,'TNode.Create');
   inherited;
   FDisabledsNewBlocksCount := 0;
@@ -515,16 +516,13 @@ begin
   FBCBankNotify.Bank := FBank;
   FBCBankNotify.OnNewBlock := OnBankNewBlock;
   FNetServer := TNetServer.Create;
-  FOperations := TPCOperationsComp.Create(Self);
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  FOperations.bank := FBank;
-  {$ENDIF}
+  FOperations := TPCOperationsComp.Create;
 
   FNotifyList := TList.Create;
   {$IFDEF BufferOfFutureOperations}
   FBufferAuxWaitingOperations := TOperationsHashTree.Create;
   {$ENDIF}
-  if Not Assigned(_Node) then _Node := Self;
+  if Not Assigned(PascalCoinNode) then PascalCoinNode := Self;
 end;
 
 class procedure TNode.DecodeIpStringToNodeServerAddressArray(
@@ -594,7 +592,7 @@ begin
     step := 'Destroying Operations';
     FreeAndNil(FOperations);
     step := 'Assigning NIL to node var';
-    if _Node=Self then _Node := Nil;
+    if PascalCoinNode=Self then PascalCoinNode := Nil;
     Step := 'Destroying SentOperations list';
     FreeAndNil(FSentOperations);
 
@@ -708,13 +706,13 @@ end;
 
 class function TNode.Node: TNode;
 begin
-  if not assigned(_Node) then _Node := TNode.Create(Nil);
-  Result := _Node;
+  if not assigned(PascalCoinNode) then PascalCoinNode := TNode.Create(Nil);
+  Result := PascalCoinNode;
 end;
 
 class function TNode.NodeExists: Boolean;
 begin
-  Result := Assigned(_Node);
+  Result := Assigned(PascalCoinNode);
 end;
 
 procedure TNode.Notification(AComponent: TComponent; Operation: TOperation);
@@ -747,7 +745,7 @@ procedure TNode.GetStoredOperationsFromAccount(const OperationsResume: TOperatio
     acc_4_for_dev : Boolean;
   begin
     if (act_depth<=0) then exit;
-    opc := TPCOperationsComp.Create(Nil);
+    opc := TPCOperationsComp.Create;
     Try
       l := TList.Create;
       try
@@ -908,7 +906,7 @@ begin
     end;
   end;
   // Search in previous blocks
-  OperationComp := TPCOperationsComp.Create(Nil);
+  OperationComp := TPCOperationsComp.Create;
   Try
     While (n_operation>0) And (n_operation>=n_operation_low) And (block>0) do begin
       aux_block := block;
@@ -1132,7 +1130,7 @@ begin
   FPendingNotificationsList := TPCThreadList.Create('TNodeNotifyEvents_PendingNotificationsList');
   FThreadSafeNodeNotifyEvent := TThreadSafeNodeNotifyEvent.Create(Self);
   FThreadSafeNodeNotifyEvent.FreeOnTerminate := true; // This is to prevent locking when freeing component
-  Node := _Node;
+  Node := PascalCoinNode;
 end;
 
 destructor TNodeNotifyEvents.Destroy;
@@ -1279,7 +1277,7 @@ begin
   FNetConnection := NetConnection;
   FSanitizedOperationsHashTree := TOperationsHashTree.Create;
   FSanitizedOperationsHashTree.CopyFromHashTree(MakeACopyOfSanitizedOperationsHashTree);
-  FNewBlockOperations := TPCOperationsComp.Create(Nil);
+  FNewBlockOperations := TPCOperationsComp.Create;
   FNewBlockOperations.CopyFrom(MakeACopyOfNewBlockOperations);
   Inherited Create(True);
   FreeOnTerminate := true;
@@ -1323,7 +1321,7 @@ begin
 end;
 
 initialization
-  _Node := Nil;
+  PascalCoinNode := Nil;
 finalization
-  FreeAndNil(_Node);
+  FreeAndNil(PascalCoinNode);
 end.

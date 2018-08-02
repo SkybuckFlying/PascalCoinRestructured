@@ -916,10 +916,8 @@ begin
       end;
     end else begin
       if AccountNumber<0 then begin
-        opc := TPCOperationsComp.Create(Nil);
+        opc := TPCOperationsComp.Create;
         try
-          {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-          opc.bank := Node.Bank;
           If FBlockEnd<0 then begin
             If Node.Bank.BlocksCount>0 then bend := Node.Bank.BlocksCount-1
             else bend := 0;
@@ -956,7 +954,6 @@ begin
             end else break;
             bend := bend - 1;
           end;
-          {$ENDIF}
         finally
           opc.Free;
         end;
@@ -1307,10 +1304,8 @@ begin
       else nstart := 0;
     end;
     SetLength(FBlockChainDataArray,nend - nstart +1);
-    opc := TPCOperationsComp.Create(Nil);
+    opc := TPCOperationsComp.Create;
     try
-      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-      opc.bank := Node.Bank;
       while (nstart<=nend) do begin
         i := length(FBlockChainDataArray) - (nend-nstart+1);
         bcd := CT_TBlockChainData_NUL;
@@ -1347,7 +1342,6 @@ begin
         FBlockChainDataArray[i] := bcd;
         if (nend>0) then dec(nend) else break;
       end;
-      {$ENDIF}
     finally
       opc.Free;
     end;

@@ -89,7 +89,7 @@ Type
 
 implementation
 
-Uses ULog, SysUtils, UConst;
+Uses ULog, SysUtils, UConst, UPCBank;
 
 { TFileStorage }
 
@@ -402,16 +402,13 @@ begin
       if Not assigned(db) then begin
         db := TFileStorage.Create(Nil);
         db.DatabaseFolder := Self.DatabaseFolder;
-        {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-        db.Bank := Self.Bank;
-        {$ENDIF}
         db.Orphan := DestOrphan;
         db.FStreamFirstBlockNumber := Start_Block;
       end;
       if db is TFileStorage then TFileStorage(db).LockBlockChainStream;
       try
         db.FIsMovingBlockchain:=True;
-        ops := TPCOperationsComp.Create(Nil);
+        ops := TPCOperationsComp.Create;
         try
           b := Start_Block;
           while LoadBlockChainBlock(ops,b) do begin
@@ -484,11 +481,9 @@ begin
           ms.CopyFrom(fs,0);
           fs.Position := 0;
           ms.Position := 0;
-          {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-          if not Bank.LoadBankFromStream(ms,False,errors) then begin
+          if not PascalCoinBank.LoadBankFromStream(ms,False,errors) then begin
             TLog.NewLog(lterror,ClassName,'Error reading bank from file: '+filename+ ' Error: '+errors);
           end;
-          {$ENDIF}
         Finally
           ms.Free;
         End;
@@ -507,16 +502,15 @@ var fs: TFileStream;
     ms : TMemoryStream;
 begin
   Result := true;
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  bankfilename := GetSafeboxCheckpointingFileName(GetFolder(Orphan),Bank.BlocksCount);
+  bankfilename := GetSafeboxCheckpointingFileName(GetFolder(Orphan),PascalCoinBank.BlocksCount);
   if (bankfilename<>'') then begin
-    TLog.NewLog(ltInfo,ClassName,'Saving Safebox blocks:'+IntToStr(Bank.BlocksCount)+' file:'+bankfilename);
+    TLog.NewLog(ltInfo,ClassName,'Saving Safebox blocks:'+IntToStr(PascalCoinBank.BlocksCount)+' file:'+bankfilename);
     fs := TFileStream.Create(bankfilename,fmCreate);
     try
       fs.Size := 0;
       ms := TMemoryStream.Create;
       try
-        Bank.SafeBox.SaveSafeBoxToAStream(ms,0,Bank.SafeBox.BlocksCount-1);
+        PascalCoinBank.SafeBox.SaveSafeBoxToAStream(ms,0,PascalCoinBank.SafeBox.BlocksCount-1);
         ms.Position := 0;
         fs.Position := 0;
         fs.CopyFrom(ms,0);
@@ -527,8 +521,8 @@ begin
       fs.Free;
     end;
     // Save a copy each 10000 blocks (aprox 1 month) only when not an orphan
-    if (Orphan='') And ((Bank.BlocksCount MOD (CT_BankToDiskEveryNBlocks*100))=0) then begin
-      aux_newfilename := GetFolder('') + PathDelim+'checkpoint_'+ inttostr(Bank.BlocksCount)+'.safebox';
+    if (Orphan='') And ((PascalCoinBank.BlocksCount MOD (CT_BankToDiskEveryNBlocks*100))=0) then begin
+      aux_newfilename := GetFolder('') + PathDelim+'checkpoint_'+ inttostr(PascalCoinBank.BlocksCount)+'.safebox';
       try
         {$IFDEF FPC}
         DoCopyFile(bankfilename,aux_newfilename);
@@ -542,7 +536,6 @@ begin
       end;
     end;
   end;
-  {$ENDIF}
 end;
 
 function TFileStorage.DoSaveBlockChain(Operations: TPCOperationsComp): Boolean;
@@ -566,9 +559,7 @@ begin
   Finally
     UnlockBlockChainStream;
   End;
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  if Assigned(Bank) then SaveBank;
-  {$ENDIF}
+  if Assigned(PascalCoinBank) then SaveBank;
 end;
 
 Const CT_SafeboxsToStore = 10;
@@ -702,9 +693,7 @@ begin
   fs := TFileStream.Create(Filename,fmOpenRead);
   try
     fs.Position:=0;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    Result := Bank.SafeBox.LoadSafeBoxStreamHeader(fs,safeBoxHeader);
-    {$ENDIF}
+    Result := PascalCoinBank.SafeBox.LoadSafeBoxStreamHeader(fs,safeBoxHeader);
   finally
     fs.Free;
   end;

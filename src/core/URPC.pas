@@ -137,7 +137,7 @@ class procedure TPascalCoinJSONComp.FillBlockObject(nBlock : Cardinal; ANode : T
 var pcops : TPCOperationsComp;
   ob : TOperationBlock;
 begin
-  pcops := TPCOperationsComp.Create(Nil);
+  pcops := TPCOperationsComp.Create;
   try
     If ANode.Bank.BlocksCount<=nBlock then begin
       Exit;
@@ -2884,7 +2884,7 @@ begin
     // Returns a JSON object with operation values as "Operation resume format"
     c := params.GetAsVariant('block').AsCardinal(CT_MaxBlock);
     if (c>=0) And (c<FNode.Bank.BlocksCount) then begin
-      pcops := TPCOperationsComp.Create(Nil);
+      pcops := TPCOperationsComp.Create;
       try
         If Not FNode.Bank.LoadOperations(pcops,c) then begin
           ErrorNum := CT_RPC_ErrNum_InternalError;
@@ -2917,7 +2917,7 @@ begin
     // Returns a JSON array with items as "Operation resume format"
     c := params.GetAsVariant('block').AsCardinal(CT_MaxBlock);
     if (c>=0) And (c<FNode.Bank.BlocksCount) then begin
-      pcops := TPCOperationsComp.Create(Nil);
+      pcops := TPCOperationsComp.Create;
       try
         If Not FNode.Bank.LoadOperations(pcops,c) then begin
           ErrorNum := CT_RPC_ErrNum_InternalError;
@@ -3018,7 +3018,7 @@ begin
       ErrorDesc:='param ophash not found or invalid hexadecimal value "'+params.AsString('ophash','')+'"';
       exit;
     end;
-    pcops := TPCOperationsComp.Create(Nil);
+    pcops := TPCOperationsComp.Create;
     try
       Case FNode.FindOperationExt(pcops,r1,c,i) of
         found : ;

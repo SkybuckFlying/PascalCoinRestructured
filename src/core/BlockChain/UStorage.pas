@@ -11,14 +11,7 @@ type
   private
     FOrphan: TOrphan;
 
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    FBank : TPCBank;
-    {$ENDIF}
-
     FReadOnly: Boolean;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    procedure SetBank(const Value: TPCBank);
-    {$ENDIF}
   protected
     FIsMovingBlockchain : Boolean;
     procedure SetOrphan(const Value: TOrphan); virtual;
@@ -49,9 +42,6 @@ type
     Constructor Create(AOwner : TComponent); Override;
     Property Orphan : TOrphan read FOrphan write SetOrphan;
     Property ReadOnly : Boolean read FReadOnly write SetReadOnly;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    Property Bank : TPCBank read FBank write SetBank;
-    {$ENDIF}
     Procedure CopyConfiguration(Const CopyFrom : TStorage); virtual;
     Property FirstBlock : Int64 read GetFirstBlockNumber;
     Property LastBlock : Int64 read GetLastBlockNumber;
@@ -67,7 +57,7 @@ type
 implementation
 
 uses
-  SysUtils, ULog;
+  SysUtils, ULog, UPCBank, UPCSafeBox;
 
 { TStorage }
 
@@ -139,18 +129,16 @@ function TStorage.SaveBank: Boolean;
 begin
   Result := true;
   If FIsMovingBlockchain then Exit;
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  if Not TPCSafeBox.MustSafeBoxBeSaved(Bank.BlocksCount) then exit; // No save
+  if Not TPCSafeBox.MustSafeBoxBeSaved(PascalCoinBank.BlocksCount) then exit; // No save
   Try
     Result := DoSaveBank;
-    FBank.SafeBox.CheckMemory;
+    PascalCoinBank.SafeBox.CheckMemory;
   Except
     On E:Exception do begin
       TLog.NewLog(lterror,Classname,'Error saving Bank: '+E.Message);
       Raise;
     end;
   End;
-  {$ENDIF}
 end;
 
 function TStorage.SaveBlockChainBlock(Operations: TPCOperationsComp): Boolean;
@@ -165,13 +153,6 @@ begin
     end;
   End;
 end;
-
-{$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-procedure TStorage.SetBank(const Value: TPCBank);
-begin
-  FBank := Value;
-end;
-{$ENDIF}
 
 procedure TStorage.SetOrphan(const Value: TOrphan);
 begin

@@ -7,11 +7,8 @@ uses
 
 type
   { TPCOperationsComp }
-  TPCOperationsComp = Class(TComponent)
+  TPCOperationsComp = Class
   private
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    FBank: TPCBank;
-    {$ENDIF}
     FSafeBoxTransaction : TPCSafeBoxTransaction;
     FOperationBlock: TOperationBlock;
     FOperationsHashTree : TOperationsHashTree;
@@ -24,9 +21,6 @@ type
     FOperationsLock : TPCCriticalSection;
     FPreviousUpdatedBlocks : TAccountPreviousBlockInfo; // New Protocol V3 struct to store previous updated blocks
     function GetOperation(index: Integer): TPCOperation;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    procedure SetBank(const value: TPCBank);
-    {$ENDIF}
     procedure SetnOnce(const value: Cardinal);
     procedure Settimestamp(const value: Cardinal);
     function GetnOnce: Cardinal;
@@ -40,20 +34,17 @@ type
     procedure SetBlockPayload(const Value: TRawBytes);
     procedure OnOperationsHashTreeChanged(Sender : TObject);
   protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); Override;
+//    procedure Notification(AComponent: TComponent; Operation: TOperation); Override;
     function SaveBlockToStreamExt(save_only_OperationBlock : Boolean; Stream: TStream; SaveToStorage : Boolean): Boolean;
     function LoadBlockFromStreamExt(Stream: TStream; LoadingFromStorage : Boolean; var errors: AnsiString): Boolean;
   public
-    Constructor Create(AOwner: TComponent); Override;
+    Constructor Create;
     Destructor Destroy; Override;
     Procedure CopyFromExceptAddressKey(Operations : TPCOperationsComp);
     Procedure CopyFrom(Operations : TPCOperationsComp);
     Function AddOperation(Execute : Boolean; op: TPCOperation; var errors: AnsiString): Boolean;
     Function AddOperations(operations: TOperationsHashTree; var errors: AnsiString): Integer;
     Property Operation[index: Integer]: TPCOperation read GetOperation;
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    Property bank: TPCBank read FBank write SetBank;
-    {$ENDIF}
     Procedure Clear(DeleteOperations : Boolean);
     Function Count: Integer;
     Property OperationBlock: TOperationBlock read FOperationBlock;
@@ -94,12 +85,6 @@ type
     Property PreviousUpdatedBlocks : TAccountPreviousBlockInfo read FPreviousUpdatedBlocks; // New Protocol V3 struct to store previous updated blocks
   End;
 
-  // *** Skybuck: Super experimental and probably flawed code, going to do a git commit because here/these circular refences is where things start to get tricky ! ***
-//  TPCBank = class
-
-//  end;
-
-
 implementation
 
 uses
@@ -114,16 +99,14 @@ Begin
     errors := '';
     Result := False;
     if Execute then begin
-      {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-      if (FBank = Nil) then begin
+      if (PascalCoinBank = Nil) then begin
         errors := 'No Bank';
         exit;
       end;
-      if (FBank.BlocksCount<>OperationBlock.block) then begin
+      if (PascalCoinBank.BlocksCount<>OperationBlock.block) then begin
         errors := 'Bank blockcount<>OperationBlock.Block';
         exit;
       end;
-      {$ENDIF}
       // Only process when in current address, prevent do it when reading operations from file
       Result := op.DoOperation(FPreviousUpdatedBlocks, FSafeBoxTransaction, errors);
     end else Result := true;
@@ -208,20 +191,19 @@ begin
 
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    if Assigned(FBank) then begin
-      FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
-      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
+    if Assigned(PascalCoinBank) then begin
+      FOperationBlock.protocol_version := PascalCoinBank.SafeBox.CurrentProtocol;
+      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
         FOperationBlock.protocol_version := CT_PROTOCOL_2; // If minting... upgrade to Protocol 2
-      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
+      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
         FOperationBlock.protocol_version := CT_PROTOCOL_3; // If minting... upgrade to Protocol 3
       end;
-      FOperationBlock.block := FBank.BlocksCount;
-      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(FBank.BlocksCount);
-      FOperationBlock.compact_target := FBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
-      FOperationBlock.initial_safe_box_hash := FBank.SafeBox.SafeBoxHash;
-      If FBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
-        FOperationBlock.timestamp := FBank.LastOperationBlock.timestamp;
+      FOperationBlock.block := PascalCoinBank.BlocksCount;
+      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinBank.BlocksCount);
+      FOperationBlock.compact_target := PascalCoinBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+      FOperationBlock.initial_safe_box_hash := PascalCoinBank.SafeBox.SafeBoxHash;
+      If PascalCoinBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
+        FOperationBlock.timestamp := PascalCoinBank.LastOperationBlock.timestamp;
     end else begin
       FOperationBlock.block := 0;
       FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(0);
@@ -229,7 +211,6 @@ begin
       FOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash); // Nothing for first line
       FOperationBlock.protocol_version := CT_PROTOCOL_1;
     end;
-    {$ENDIF}
 
     FOperationBlock.operations_hash := FOperationsHashTree.HashTree;
     FOperationBlock.fee := 0;
@@ -278,9 +259,7 @@ begin
     FOperationBlock := Operations.FOperationBlock;
     FOperationBlock.account_key := lastopb.account_key; // Except AddressKey
 
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    FOperationBlock.compact_target := FBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
-    {$ENDIF}
+    FOperationBlock.compact_target := PascalCoinBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
 
     FIsOnlyOperationBlock := Operations.FIsOnlyOperationBlock;
     FOperationsHashTree.CopyFromHashTree(Operations.FOperationsHashTree);
@@ -301,9 +280,9 @@ begin
   Result := FOperationsHashTree.OperationsCount;
 end;
 
-constructor TPCOperationsComp.Create(AOwner: TComponent);
+constructor TPCOperationsComp.Create;
 begin
-  inherited Create(AOwner);
+  inherited Create;
   FOperationsLock := TPCCriticalSection.Create('TPCOperationsComp_OPERATIONSLOCK');
   FDisableds := 0;
   FStreamPoW := TMemoryStream.Create;
@@ -311,19 +290,11 @@ begin
   FOperationsHashTree := TOperationsHashTree.Create;
   FOperationsHashTree.OnChanged:= OnOperationsHashTreeChanged;
 
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  FBank := Nil;
-  {$ENDIF}
-
   FOperationBlock := GetFirstBlock;
   FSafeBoxTransaction := Nil;
   FPreviousUpdatedBlocks := TAccountPreviousBlockInfo.Create;
 
-  {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-  if Assigned(AOwner) And (AOwner is TPCBank) then begin
-    SetBank( TPCBank(AOwner) );
-  end else Clear(true);
-  {$ENDIF}
+  Clear(true);
 end;
 
 destructor TPCOperationsComp.Destroy;
@@ -534,6 +505,7 @@ begin
   end;
 end;
 
+(*
 procedure TPCOperationsComp.Notification(AComponent: TComponent;
   Operation: TOperation);
 begin
@@ -548,6 +520,7 @@ begin
     {$ENDIF}
   end;
 end;
+*)
 
 class function TPCOperationsComp.OperationBlockToText(const OperationBlock: TOperationBlock): AnsiString;
 begin
@@ -583,22 +556,21 @@ begin
   Try
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    if Assigned(FBank) then begin
-      FOperationBlock.protocol_version := FBank.SafeBox.CurrentProtocol;
-      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
+    if Assigned(PascalCoinBank) then begin
+      FOperationBlock.protocol_version := PascalCoinBank.SafeBox.CurrentProtocol;
+      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
         TLog.NewLog(ltinfo,ClassName,'New miner protocol version to 2 at sanitize');
         FOperationBlock.protocol_version := CT_PROTOCOL_2;
-      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (FBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
+      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
         TLog.NewLog(ltinfo,ClassName,'New miner protocol version to 3 at sanitize');
         FOperationBlock.protocol_version := CT_PROTOCOL_3;
       end;
-      FOperationBlock.block := FBank.BlocksCount;
-      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(FBank.BlocksCount);
-      FOperationBlock.compact_target := FBank.SafeBox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
-      FOperationBlock.initial_safe_box_hash := FBank.SafeBox.SafeBoxHash;
-      If FBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
-        FOperationBlock.timestamp := FBank.LastOperationBlock.timestamp;
+      FOperationBlock.block := PascalCoinBank.BlocksCount;
+      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinBank.BlocksCount);
+      FOperationBlock.compact_target := PascalCoinBank.SafeBox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+      FOperationBlock.initial_safe_box_hash := PascalCoinBank.SafeBox.SafeBoxHash;
+      If PascalCoinBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
+        FOperationBlock.timestamp := PascalCoinBank.LastOperationBlock.timestamp;
     end else begin
       FOperationBlock.block := 0;
       FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(0);
@@ -606,7 +578,6 @@ begin
       FOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash);
       FOperationBlock.protocol_version := CT_PROTOCOL_1;
     end;
-    {$ENDIF}
 
     FOperationBlock.proof_of_work := '';
     FOperationBlock.protocol_available := CT_BlockChain_Protocol_Available;
@@ -769,6 +740,7 @@ begin
   end;
 end;
 
+(*
 {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
 procedure TPCOperationsComp.SetBank(const value: TPCBank);
 begin
@@ -784,6 +756,7 @@ begin
   Clear(true);
 end;
 {$ENDIF}
+*)
 
 procedure TPCOperationsComp.SetBlockPayload(const Value: TRawBytes);
 begin
@@ -813,11 +786,9 @@ begin
   Try
     ts := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    if Assigned(FBank) then begin
-      If FBank.FLastOperationBlock.timestamp>ts then ts := FBank.FLastOperationBlock.timestamp;
+    if Assigned(PascalCoinBank) then begin
+      If PascalCoinBank.LastOperationBlock.timestamp>ts then ts := PascalCoinBank.LastOperationBlock.timestamp;
     end;
-    {$ENDIF}
     timestamp := ts;
   finally
     Unlock;

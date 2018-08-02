@@ -49,6 +49,9 @@ type
     property NotifyList : TList read FNotifyList;
   End;
 
+var
+  PascalCoinBank : TPCBank;
+
 implementation
 
 uses
@@ -167,7 +170,7 @@ begin
   FOnLog := Nil;
   FSafeBox := TPCSafeBox.Create;
   FNotifyList := TList.Create;
-  FLastBlockCache := TPCOperationsComp.Create(Nil);
+  FLastBlockCache := TPCOperationsComp.Create;
   FIsRestoringFromFile:=False;
   FUpgradingToV2:=False;
   Clear;
@@ -230,7 +233,8 @@ begin
         end;
       end;
       NewLog(Nil, ltinfo,'Start restoring from disk operations (Max '+inttostr(max_block)+') BlockCount: '+inttostr(BlocksCount)+' Orphan: ' +Storage.Orphan);
-      Operations := TPCOperationsComp.Create(Self);
+
+      Operations := TPCOperationsComp.Create;
       try
         while ((BlocksCount<=max_block)) do begin
           if Storage.BlockExists(BlocksCount) then begin
@@ -339,10 +343,6 @@ begin
   if Not Assigned(FStorage) then begin
     if Not Assigned(FStorageClass) then raise Exception.Create('StorageClass not defined');
     FStorage := FStorageClass.Create(Self);
-
-    {$IF DEFINED(CIRCULAR_REFERENCE_PROBLEM)}
-    FStorage.Bank := Self;
-    {$ENDIF}
   end;
   Result := FStorage;
 end;
