@@ -3,7 +3,7 @@ unit UOrderedAccountKeysList;
 interface
 
 uses
-  UPCSafeBox, UThread, Classes, UAccountKey, UOrderedCardinalList, UAccountKeyArray;
+  UPascalCoinSafeBox, UThread, Classes, UAccountKey, UOrderedCardinalList, UAccountKeyArray;
 
 type
   // This is a class to quickly find accountkeys and their respective account number/s

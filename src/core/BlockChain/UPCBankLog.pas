@@ -3,7 +3,7 @@ unit UPCBankLog;
 interface
 
 uses
-  {UPCBank,} UPCOperationsComp, ULog;
+  {UPascalCoinBank,} UPCOperationsComp, ULog;
 
 type
   // Skybuck: leads to circular reference, replacing with TObject

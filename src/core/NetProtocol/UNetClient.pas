@@ -13,7 +13,7 @@ type
   protected
     procedure Thread( Sender : TObject );
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor Destroy; override;
 
     procedure OnTerminated(Sender: TObject);
@@ -26,7 +26,7 @@ uses
 
 { TNetClient }
 
-constructor TNetClient.Create(AOwner: TComponent);
+constructor TNetClient.Create;
 begin
   inherited;
   FThread := TPCCustomThread.Create(Thread);
@@ -55,7 +55,7 @@ begin
     Sleep(1);
   end;
   // Close connection
-  if TNetData.NetData.ConnectionExistsAndActive(Self) then begin
+  if PascalNetData.ConnectionExistsAndActive(Self) then begin
     Connected := false;
   end;
 end;
@@ -63,7 +63,7 @@ end;
 procedure TNetClient.OnTerminated(Sender: TObject);
 begin
   // Close connection
-  if TNetData.NetData.ConnectionExistsAndActive(Self) then begin
+  if PascalNetData.ConnectionExistsAndActive(Self) then begin
     Connected := false;
   end;
 end;

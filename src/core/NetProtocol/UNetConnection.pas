@@ -7,7 +7,7 @@ uses
 
 type
   { TNetConnection }
-  TNetConnection = Class(TComponent)
+  TNetConnection = Class
   private
     FIsConnecting: Boolean;
     FTcpIpClient : TNetTcpIpClient;
@@ -50,12 +50,13 @@ type
     Function ReadTcpClientBuffer(MaxWaitMiliseconds : Cardinal; var HeaderData : TNetHeaderData; BufferData : TStream) : Boolean;
     function GetClient: TNetTcpIpClient;
   protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+//    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
     Procedure Send(NetTranferType : TNetTransferType; operation, errorcode : Word; request_id : Integer; DataBuffer : TStream);
   public
     FNetLock : TPCCriticalSection;
 
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
+//    Constructor Create(AOwner : TComponent); override;
     Destructor Destroy; override;
 
     // Skybuck: moved to here to offer access to UNetServer
@@ -107,7 +108,7 @@ implementation
 
 uses
   SysUtils, ULog, UNodeServerAddress, UConst, UNetData, UTime, UECDSA_Public, UPtrInt, UNetServerClient, UPlatform, UPCOperationClass, UPCOperation, UNode, UNetProtocolConst,
-  UBlockAccount, URawBytes, UPCSafeBoxHeader, UStreamOp, UPCSafeBox, UCrypto, UPCChunk, UAccount, UAccountComp, UThreadGetNewBlockChainFromClient, UECIES, UNetClient;
+  UBlockAccount, URawBytes, UPCSafeBoxHeader, UStreamOp, UPascalCoinSafeBox, UCrypto, UPCChunk, UAccount, UAccountComp, UThreadGetNewBlockChainFromClient, UECIES, UNetClient, UPascalCoinBank;
 
 { TNetConnection }
 
@@ -160,21 +161,21 @@ begin
       if ServerPort<=0 then ServerPort := CT_NetServer_Port;
       Client.RemotePort := ServerPort;
       TLog.NewLog(ltDebug,Classname,'Trying to connect to a server at: '+ClientRemoteAddr);
-      TNetData.NetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,nsa);
+      PascalNetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,nsa);
       nsa.netConnection := Self;
-      TNetData.NetData.NodeServersAddresses.SetNodeServerAddress(nsa);
-      TNetData.NetData.NotifyNetConnectionUpdated;
+      PascalNetData.NodeServersAddresses.SetNodeServerAddress(nsa);
+      PascalNetData.NotifyNetConnectionUpdated;
       Result := Client.Connect;
     Finally
       FNetLock.Release;
     End;
     if Result then begin
       TLog.NewLog(ltDebug,Classname,'Connected to a possible server at: '+ClientRemoteAddr);
-      TNetData.NetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,nsa);
+      PascalNetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,nsa);
       nsa.netConnection := Self;
       nsa.last_connection_by_me := (UnivDateTimeToUnix(DateTime2UnivDateTime(now)));
-      TNetData.NetData.NodeServersAddresses.SetNodeServerAddress(nsa);
-      Result := Send_Hello(ntp_request,TNetData.NetData.NewRequestId);
+      PascalNetData.NodeServersAddresses.SetNodeServerAddress(nsa);
+      Result := Send_Hello(ntp_request,PascalNetData.NewRequestId);
     end else begin
       TLog.NewLog(ltDebug,Classname,'Cannot connect to a server at: '+ClientRemoteAddr);
     end;
@@ -183,7 +184,7 @@ begin
   end;
 end;
 
-constructor TNetConnection.Create(AOwner: TComponent);
+constructor TNetConnection.Create;
 begin
   inherited;
   FIsConnecting:=False;
@@ -207,9 +208,9 @@ begin
   FTcpIpClient := Nil;
   FRemoteOperationBlock := CT_OperationBlock_NUL;
   FRemoteAccumulatedWork := 0;
-  SetClient( TBufferedNetTcpIpClient.Create(Self) );
-  TNetData.NetData.NetConnections.Add(Self);
-  TNetData.NetData.NotifyNetConnectionUpdated;
+  SetClient( TBufferedNetTcpIpClient.Create );
+  PascalNetData.NetConnections.Add(Self);
+  PascalNetData.NotifyNetConnectionUpdated;
   FBufferLock := TPCCriticalSection.Create('TNetConnection_BufferLock');
   FBufferReceivedOperationsHash := TOrderedRawList.Create;
   FBufferToSendOperations := TOperationsHashTree.Create;
@@ -223,13 +224,13 @@ begin
 
     Connected := false;
 
-    TNetData.NetData.NodeServersAddresses.DeleteNetConnection(Self);
+    PascalNetData.NodeServersAddresses.DeleteNetConnection(Self);
   Finally
-    TNetData.NetData.NetConnections.Remove(Self);
+    PascalNetData.NetConnections.Remove(Self);
   End;
-  TNetData.NetData.UnRegisterRequest(Self,0,0);
+  PascalNetData.UnRegisterRequest(Self,0,0);
   Try
-    TNetData.NetData.NotifyNetConnectionUpdated;
+    PascalNetData.NotifyNetConnectionUpdated;
   Finally
     FreeAndNil(FNetLock);
     FreeAndNil(FClientBufferRead);
@@ -256,22 +257,22 @@ begin
     And (Not SameText('192.168.',Copy(Client.RemoteHost,1,8)))
     And (Not SameText('10.',Copy(Client.RemoteHost,1,3)));
   if include_in_list then begin
-    If TNetData.NetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,ns) then begin
+    If PascalNetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,ns) then begin
       ns.last_connection := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
       ns.its_myself := ItsMyself;
       ns.BlackListText := Why;
       ns.is_blacklisted := true;
-      TNetData.NetData.NodeServersAddresses.SetNodeServerAddress(ns);
+      PascalNetData.NodeServersAddresses.SetNodeServerAddress(ns);
     end;
   end else if ItsMyself then begin
-    If TNetData.NetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,ns) then begin
+    If PascalNetData.NodeServersAddresses.GetNodeServerAddress(Client.RemoteHost,Client.RemotePort,true,ns) then begin
       ns.its_myself := ItsMyself;
-      TNetData.NetData.NodeServersAddresses.SetNodeServerAddress(ns);
+      PascalNetData.NodeServersAddresses.SetNodeServerAddress(ns);
     end;
   end;
   Connected := False;
-  TNetData.NetData.NotifyBlackListUpdated;
-  TNetData.NetData.NotifyNodeServersUpdated;
+  PascalNetData.NotifyBlackListUpdated;
+  PascalNetData.NotifyNodeServersUpdated;
 end;
 
 procedure TNetConnection.DoProcessBuffer;
@@ -295,12 +296,12 @@ begin
   If ((FLastDataReceivedTS>0) Or ( NOT (Self is TNetServerClient)))
      AND ((FLastDataReceivedTS+(1000*FRandomWaitSecondsSendHello)<TPlatform.GetTickCount) AND (FLastDataSendedTS+(1000*FRandomWaitSecondsSendHello)<TPlatform.GetTickCount)) then begin
      // Build 1.4 -> Changing wait time from 120 secs to a random seconds value
-    If TNetData.NetData.PendingRequest(Self,ops)>=2 then begin
+    If PascalNetData.PendingRequest(Self,ops)>=2 then begin
       TLog.NewLog(ltDebug,Classname,'Pending requests without response... closing connection to '+ClientRemoteAddr+' > '+ops);
       Connected := false;
     end else begin
       TLog.NewLog(ltDebug,Classname,'Sending Hello to check connection to '+ClientRemoteAddr+' > '+ops);
-      Send_Hello(ntp_request,TNetData.NetData.NewRequestId);
+      Send_Hello(ntp_request,PascalNetData.NewRequestId);
     end;
   end else if (Self is TNetServerClient) AND (FLastDataReceivedTS=0) And (FCreatedTime+EncodeTime(0,1,0,0)<Now) then begin
     // Disconnecting client without data...
@@ -363,7 +364,7 @@ begin
         Finally
           FBufferLock.Release;
         End;
-        TNode.Node.AddOperations(Self,operations,Nil,errors);
+        PascalCoinNode.AddOperations(Self,operations,Nil,errors);
       end;
     finally
       operations.Free;
@@ -397,8 +398,8 @@ begin
        errors := 'Invalid structure start or end: '+Inttostr(b_start)+' '+Inttostr(b_end);
        exit;
      end;
-     if (b_end>=TNetData.NetData.Bank.BlocksCount) then begin
-       b_end := TNetData.NetData.Bank.BlocksCount-1;
+     if (b_end>=PascalCoinSafeBox.BlocksCount) then begin
+       b_end := PascalCoinSafeBox.BlocksCount-1;
        if (b_start>b_end) then begin
          // No data:
          db := TMemoryStream.Create;
@@ -427,7 +428,7 @@ begin
          b := b_start;
          for b := b_start to b_end do begin
            inc(c);
-           If TNetData.NetData.bank.LoadOperations(op,b) then begin
+           If PascalCoinBank.LoadOperations(op,b) then begin
              op.SaveBlockToStream(false,db);
            end else begin
              SendError(ntp_response,HeaderData.operation,HeaderData.request_id,CT_NetError_InternalServerError,'Operations of block:'+inttostr(b)+' not found');
@@ -491,31 +492,31 @@ begin
            DoDisconnect := true;
            exit;
         end;
-        if (op.OperationBlock.block=TNode.Node.Bank.BlocksCount) then begin
-          if (TNode.Node.Bank.AddNewBlockChainBlock(op,TNetData.NetData.NetworkAdjustedTime.GetMaxAllowedTimestampForNewBlock, newBlockAccount,errors)) then begin
+        if (op.OperationBlock.block=PascalCoinSafeBox.BlocksCount) then begin
+          if (PascalCoinBank.AddNewBlockChainBlock(op,PascalNetData.NetworkAdjustedTime.GetMaxAllowedTimestampForNewBlock, newBlockAccount,errors)) then begin
             // Ok, one more!
           end else begin
             // Is not a valid entry????
             // Perhaps an orphan blockchain: Me or Client!
             TLog.NewLog(ltinfo,Classname,'Distinct operation block found! My:'+
-                TPCOperationsComp.OperationBlockToText(TNode.Node.Bank.SafeBox.Block(TNode.Node.Bank.BlocksCount-1).blockchainInfo)+
+                TPCOperationsComp.OperationBlockToText(PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-1).blockchainInfo)+
                 ' remote:'+TPCOperationsComp.OperationBlockToText(op.OperationBlock)+' Errors: '+errors);
           end;
         end else begin
           // Receiving an unexpected operationblock
-          TLog.NewLog(lterror,classname,'Received a distinct block, finalizing: '+TPCOperationsComp.OperationBlockToText(op.OperationBlock)+' (My block: '+TPCOperationsComp.OperationBlockToText(TNode.Node.Bank.LastOperationBlock)+')' );
+          TLog.NewLog(lterror,classname,'Received a distinct block, finalizing: '+TPCOperationsComp.OperationBlockToText(op.OperationBlock)+' (My block: '+TPCOperationsComp.OperationBlockToText(PascalCoinBank.LastOperationBlock)+')' );
           FIsDownloadingBlocks := false;
           exit;
         end;
       end;
       FIsDownloadingBlocks := false;
-      if ((opcount>0) And (FRemoteOperationBlock.block>=TNode.Node.Bank.BlocksCount)) then begin
-        Send_GetBlocks(TNode.Node.Bank.BlocksCount,100,i);
+      if ((opcount>0) And (FRemoteOperationBlock.block>=PascalCoinSafeBox.BlocksCount)) then begin
+        Send_GetBlocks(PascalCoinSafeBox.BlocksCount,100,i);
       end else begin
         // No more blocks to download, download Pending operations
         DoProcess_GetPendingOperations;
       end;
-      TNode.Node.NotifyBlocksChanged;
+      PascalCoinNode.NotifyBlocksChanged;
     Finally
       op.Free;
     End;
@@ -547,21 +548,21 @@ begin
     end;
     DataBuffer.Read(b_start,4);
     DataBuffer.Read(b_end,4);
-    if (b_start<0) Or (b_start>b_end) Or (b_start>=TNode.Node.Bank.BlocksCount) then begin
-      errors := 'Invalid start ('+Inttostr(b_start)+') or end ('+Inttostr(b_end)+') of count ('+Inttostr(TNode.Node.Bank.BlocksCount)+')';
+    if (b_start<0) Or (b_start>b_end) Or (b_start>=PascalCoinSafeBox.BlocksCount) then begin
+      errors := 'Invalid start ('+Inttostr(b_start)+') or end ('+Inttostr(b_end)+') of count ('+Inttostr(PascalCoinSafeBox.BlocksCount)+')';
       exit;
     end;
 
     DoDisconnect := false;
 
-    if (b_end>=TNode.Node.Bank.BlocksCount) then b_end := TNode.Node.Bank.BlocksCount-1;
+    if (b_end>=PascalCoinSafeBox.BlocksCount) then b_end := PascalCoinSafeBox.BlocksCount-1;
     inc_b := ((b_end - b_start) DIV CT_Max_Positions)+1;
     msops := TMemoryStream.Create;
     try
       b := b_start;
       total_b := 0;
       repeat
-        ob := TNode.Node.Bank.SafeBox.Block(b).blockchainInfo;
+        ob := PascalCoinSafeBox.Block(b).blockchainInfo;
         If TPCOperationsComp.SaveOperationBlockToStream(ob,msops) then begin
           blocksstr := blocksstr + inttostr(b)+',';
           b := b + inc_b;
@@ -618,7 +619,7 @@ begin
   DataBuffer.Read(_from,SizeOf(_from));
   DataBuffer.Read(_to,SizeOf(_to));
   //
-  sbStream := TNode.Node.Bank.Storage.CreateSafeBoxStream(_blockcount);
+  sbStream := PascalCoinBank.Storage.CreateSafeBoxStream(_blockcount);
   try
     responseStream := TMemoryStream.Create;
     try
@@ -680,7 +681,7 @@ begin
     DataBuffer.Read(b,1);
     if (b=1) then begin
       // Return count
-      c := TNode.Node.Operations.Count;
+      c := PascalCoinNode.Operations.Count;
       responseStream.Write(c,SizeOf(c));
     end else if (b=2) then begin
       // Return from start to start+max
@@ -695,17 +696,17 @@ begin
       end;
       opht := TOperationsHashTree.Create;
       Try
-        TNode.Node.Operations.Lock;
+        PascalCoinNode.Operations.Lock;
         Try
-          if (start >= TNode.Node.Operations.Count) Or (max=0) then begin
+          if (start >= PascalCoinNode.Operations.Count) Or (max=0) then begin
           end else begin
-            if (start + max >= TNode.Node.Operations.Count) then max := TNode.Node.Operations.Count - start;
+            if (start + max >= PascalCoinNode.Operations.Count) then max := PascalCoinNode.Operations.Count - start;
             for i:=start to (start + max -1) do begin
-              opht.AddOperationToHashTree(TNode.Node.Operations.OperationsHashTree.GetOperation(i));
+              opht.AddOperationToHashTree(PascalCoinNode.Operations.OperationsHashTree.GetOperation(i));
             end;
           end;
         finally
-          TNode.Node.Operations.Unlock;
+          PascalCoinNode.Operations.Unlock;
         end;
         opht.SaveOperationsHashTreeToStream(responseStream,False);
       Finally
@@ -746,7 +747,7 @@ begin
   try
     b := 1;
     dataSend.Write(b,1);
-    request_id := TNetData.NetData.NewRequestId;
+    request_id := PascalNetData.NewRequestId;
     If Not DoSendAndWaitForResponse(CT_NetOp_GetPendingOperations,request_id,dataSend,dataReceived,20000,headerData) then begin
       Exit;
     end;
@@ -771,7 +772,7 @@ begin
       dataSend.Write(cStart,SizeOf(cStart));
       cMax := 1000;  // Limiting in 1000 by round
       dataSend.Write(cMax,SizeOf(cMax));
-      request_id := TNetData.NetData.NewRequestId;
+      request_id := PascalNetData.NewRequestId;
       If Not DoSendAndWaitForResponse(CT_NetOp_GetPendingOperations,request_id,dataSend,dataReceived,50000,headerData) then begin
         Exit;
       end;
@@ -785,7 +786,7 @@ begin
         end;
         If (opht.OperationsCount>0) then begin
           inc(cReceived,opht.OperationsCount);
-          i := TNode.Node.AddOperations(Self,opht,Nil,errors);
+          i := PascalCoinNode.AddOperations(Self,opht,Nil,errors);
           inc(cAddedOperations,i);
         end else Break; // No more
         inc(cStart,opht.OperationsCount);
@@ -838,7 +839,7 @@ begin
   responseStream := TMemoryStream.Create;
   try
     // Response first 4 bytes are current block number
-    c := TNode.Node.Bank.BlocksCount-1;
+    c := PascalCoinSafeBox.BlocksCount-1;
     responseStream.Write(c,SizeOf(c));
     //
     if HeaderData.header_type<>ntp_request then begin
@@ -866,15 +867,15 @@ begin
         errors := 'Invalid start/max value';
         Exit;
       end;
-      if (start >= TNode.Node.Bank.AccountsCount) Or (max=0) then begin
+      if (start >= PascalCoinSafeBox.AccountsCount) Or (max=0) then begin
         c := 0;
         responseStream.Write(c,SizeOf(c));
       end else begin
-        if (start + max >= TNode.Node.Bank.AccountsCount) then max := TNode.Node.Bank.AccountsCount - start;
+        if (start + max >= PascalCoinSafeBox.AccountsCount) then max := PascalCoinSafeBox.AccountsCount - start;
         c := max;
         responseStream.Write(c,SizeOf(c));
         for i:=start to (start + max -1) do begin
-          acc := TNode.Node.Operations.SafeBoxTransaction.Account(i);
+          acc := PascalCoinNode.Operations.SafeBoxTransaction.Account(i);
           TAccountComp.SaveAccountToAStream(responseStream,acc);
         end;
       end;
@@ -885,8 +886,8 @@ begin
       max := c;
       for i:=1 to max do begin
         DataBuffer.Read(c,SizeOf(c));
-        if (c>=0) And (c<TNode.Node.Bank.AccountsCount) then begin
-          acc := TNode.Node.Operations.SafeBoxTransaction.Account(c);
+        if (c>=0) And (c<PascalCoinSafeBox.AccountsCount) then begin
+          acc := PascalCoinNode.Operations.SafeBoxTransaction.Account(c);
           TAccountComp.SaveAccountToAStream(responseStream,acc);
         end else begin
           errors := 'Invalid account number '+Inttostr(c);
@@ -943,21 +944,21 @@ Begin
       exit;
     end;
     lastTimestampDiff := FTimestampDiff;
-    FTimestampDiff := Integer( Int64(connection_ts) - Int64(TNetData.NetData.NetworkAdjustedTime.GetAdjustedTime) );
+    FTimestampDiff := Integer( Int64(connection_ts) - Int64(PascalNetData.NetworkAdjustedTime.GetAdjustedTime) );
     If FClientTimestampIp='' then begin
       isFirstHello := True;
       FClientTimestampIp := FTcpIpClient.RemoteHost;
-      TNetData.NetData.NetworkAdjustedTime.AddNewIp(FClientTimestampIp,connection_ts);
-      if (Abs(TNetData.NetData.NetworkAdjustedTime.TimeOffset)>CT_MaxFutureBlockTimestampOffset) then begin
-        TNode.Node.NotifyNetClientMessage(Nil,'The detected network time is different from this system time in '+
-          IntToStr(TNetData.NetData.NetworkAdjustedTime.TimeOffset)+' seconds! Please check your local time/timezone');
+      PascalNetData.NetworkAdjustedTime.AddNewIp(FClientTimestampIp,connection_ts);
+      if (Abs(PascalNetData.NetworkAdjustedTime.TimeOffset)>CT_MaxFutureBlockTimestampOffset) then begin
+        PascalCoinNode.NotifyNetClientMessage(Nil,'The detected network time is different from this system time in '+
+          IntToStr(PascalNetData.NetworkAdjustedTime.TimeOffset)+' seconds! Please check your local time/timezone');
       end;
       if (Abs(FTimestampDiff) > CT_MaxFutureBlockTimestampOffset) then begin
         TLog.NewLog(ltDebug,ClassName,'Detected a node ('+ClientRemoteAddr+') with incorrect timestamp: '+IntToStr(connection_ts)+' offset '+IntToStr(FTimestampDiff) );
       end;
     end else begin
       isFirstHello := False;
-      TNetData.NetData.NetworkAdjustedTime.UpdateIp(FClientTimestampIp,connection_ts);
+      PascalNetData.NetworkAdjustedTime.UpdateIp(FClientTimestampIp,connection_ts);
     end;
     If (Abs(lastTimestampDiff) > CT_MaxFutureBlockTimestampOffset) And (Abs(FTimestampDiff) <= CT_MaxFutureBlockTimestampOffset) then begin
       TLog.NewLog(ltDebug,ClassName,'Corrected timestamp for node ('+ClientRemoteAddr+') old offset: '+IntToStr(lastTimestampDiff)+' current offset '+IntToStr(FTimestampDiff) );
@@ -966,12 +967,12 @@ Begin
     if (connection_has_a_server>0) And (Not SameText(Client.RemoteHost,'localhost')) And (Not SameText(Client.RemoteHost,'127.0.0.1'))
       And (Not SameText('192.168.',Copy(Client.RemoteHost,1,8)))
       And (Not SameText('10.',Copy(Client.RemoteHost,1,3)))
-      And (Not TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.NodePrivateKey.PublicKey)) then begin
+      And (Not TAccountComp.EqualAccountKeys(FClientPublicKey,PascalNetData.NodePrivateKey.PublicKey)) then begin
       nsa := CT_TNodeServerAddress_NUL;
       nsa.ip := Client.RemoteHost;
       nsa.port := connection_has_a_server;
       nsa.last_connection := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
-      TNetData.NetData.AddServer(nsa);
+      PascalNetData.AddServer(nsa);
     end;
 
     if op.LoadBlockFromStream(DataBuffer,errors) then begin
@@ -984,7 +985,7 @@ Begin
           DataBuffer.Read(nsa.port,2);
           DataBuffer.Read(nsa.last_connection_by_server,4);
           If (nsa.last_connection_by_server>0) And (i<=CT_MAX_NODESERVERS_ON_HELLO) then // Protect massive data
-            TNetData.NetData.AddServer(nsa);
+            PascalNetData.AddServer(nsa);
         end;
         if TStreamOp.ReadAnsiString(DataBuffer,other_version)>=0 then begin
           // Captures version
@@ -995,9 +996,9 @@ Begin
           end;
         end;
         //
-        if (FRemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) Or
-          ((FRemoteAccumulatedWork=0) And (TNetData.NetData.MaxRemoteOperationBlock.block<FRemoteOperationBlock.block)) then begin
-          TNetData.NetData.MaxRemoteOperationBlock := FRemoteOperationBlock;
+        if (FRemoteAccumulatedWork>PascalCoinSafeBox.WorkSum) Or
+          ((FRemoteAccumulatedWork=0) And (PascalNetData.MaxRemoteOperationBlock.block<FRemoteOperationBlock.block)) then begin
+          PascalNetData.MaxRemoteOperationBlock := FRemoteOperationBlock;
           if TPCThread.ThreadClassFound(TThreadGetNewBlockChainFromClient,nil)<0 then begin
             TThreadGetNewBlockChainFromClient.Create;
           end;
@@ -1014,19 +1015,19 @@ Begin
         // Protection of invalid timestamp when is a new incoming connection due to wait time
         if (isFirstHello) And (Self is TNetServerClient) and (HeaderData.header_type=ntp_request) and (Abs(FTimestampDiff) > CT_MaxFutureBlockTimestampOffset) then begin
           TLog.NewLog(ltDebug,ClassName,'Sending HELLO again to ('+ClientRemoteAddr+') in order to check invalid current Timestamp offset: '+IntToStr(FTimestampDiff) );
-          Send_Hello(ntp_request,TNetData.NetData.NewRequestId);
+          Send_Hello(ntp_request,PascalNetData.NewRequestId);
         end;
 
-        if (TAccountComp.EqualAccountKeys(FClientPublicKey,TNetData.NetData.NodePrivateKey.PublicKey)) then begin
+        if (TAccountComp.EqualAccountKeys(FClientPublicKey,PascalNetData.NodePrivateKey.PublicKey)) then begin
           DisconnectInvalidClient(true,'MySelf disconnecting...');
           exit;
         end;
-        Duplicate := TNetData.NetData.FindConnectionByClientRandomValue(Self);
+        Duplicate := PascalNetData.FindConnectionByClientRandomValue(Self);
         if (Duplicate<>Nil) And (Duplicate.Connected) then begin
           DisconnectInvalidClient(true,'Duplicate connection with '+Duplicate.ClientRemoteAddr);
           exit;
         end;
-        TNetData.NetData.NotifyReceivedHelloMessage;
+        PascalNetData.NotifyReceivedHelloMessage;
       end else begin
         DisconnectInvalidClient(false,'Invalid header type > '+TNetData.HeaderDataToText(HeaderData));
       end;
@@ -1059,7 +1060,7 @@ begin
       errors := 'Invalid message data';
       exit;
     end;
-    If Not ECIESDecrypt(TNetData.NetData.NodePrivateKey.EC_OpenSSL_NID,TNetData.NetData.NodePrivateKey.PrivateKey,false,messagecrypted,decrypted) then begin
+    If Not ECIESDecrypt(PascalNetData.NodePrivateKey.EC_OpenSSL_NID,PascalNetData.NodePrivateKey.PrivateKey,false,messagecrypted,decrypted) then begin
       errors := 'Error on decrypting message';
       exit;
     end;
@@ -1070,7 +1071,7 @@ begin
     else
       TLog.NewLog(ltinfo,Classname,'Received new message from '+ClientRemoteAddr+' Message ('+inttostr(length(decrypted))+' bytes) in hexadecimal: '+TCrypto.ToHexaString(decrypted));
     Try
-      TNode.Node.NotifyNetClientMessage(Self,decrypted);
+      PascalCoinNode.NotifyNetClientMessage(Self,decrypted);
     Except
       On E:Exception do begin
         TLog.NewLog(lterror,Classname,'Error processing received message. '+E.ClassName+' '+E.Message);
@@ -1111,29 +1112,29 @@ begin
         //
         if FRemoteAccumulatedWork=0 then begin
           // Old version. No data
-          if (op.OperationBlock.block>TNode.Node.Bank.BlocksCount) then begin
-            TNetData.NetData.GetNewBlockChainFromClient(Self,Format('BlocksCount:%d > my BlocksCount:%d',[op.OperationBlock.block+1,TNode.Node.Bank.BlocksCount]));
-          end else if (op.OperationBlock.block=TNode.Node.Bank.BlocksCount) then begin
+          if (op.OperationBlock.block>PascalCoinSafeBox.BlocksCount) then begin
+            PascalNetData.GetNewBlockChainFromClient(Self,Format('BlocksCount:%d > my BlocksCount:%d',[op.OperationBlock.block+1,PascalCoinSafeBox.BlocksCount]));
+          end else if (op.OperationBlock.block=PascalCoinSafeBox.BlocksCount) then begin
             // New block candidate:
-            If Not TNode.Node.AddNewBlockChain(Self,op,bacc,errors) then begin
+            If Not PascalCoinNode.AddNewBlockChain(Self,op,bacc,errors) then begin
               // Received a new invalid block... perhaps I'm an orphan blockchain
-              TNetData.NetData.GetNewBlockChainFromClient(Self,'Has a distinct block. '+errors);
+              PascalNetData.GetNewBlockChainFromClient(Self,'Has a distinct block. '+errors);
             end;
           end;
         end else begin
-          if (FRemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) then begin
-            if (op.OperationBlock.block=TNode.Node.Bank.BlocksCount) then begin
+          if (FRemoteAccumulatedWork>PascalCoinSafeBox.WorkSum) then begin
+            if (op.OperationBlock.block=PascalCoinSafeBox.BlocksCount) then begin
               // New block candidate:
-              If Not TNode.Node.AddNewBlockChain(Self,op,bacc,errors) then begin
+              If Not PascalCoinNode.AddNewBlockChain(Self,op,bacc,errors) then begin
                 // Really is a new block? (Check it)
-                if (op.OperationBlock.block=TNode.Node.Bank.BlocksCount) then begin
+                if (op.OperationBlock.block=PascalCoinSafeBox.BlocksCount) then begin
                   // Received a new invalid block... perhaps I'm an orphan blockchain
-                  TNetData.NetData.GetNewBlockChainFromClient(Self,'Higher Work with same block height. I''m a orphan blockchain candidate');
+                  PascalNetData.GetNewBlockChainFromClient(Self,'Higher Work with same block height. I''m a orphan blockchain candidate');
                 end;
               end;
             end else begin
               // Received a new higher work
-              TNetData.NetData.GetNewBlockChainFromClient(Self,Format('Higher Work and distinct blocks count. Need to download BlocksCount:%d  my BlocksCount:%d',[op.OperationBlock.block+1,TNode.Node.Bank.BlocksCount]));
+              PascalNetData.GetNewBlockChainFromClient(Self,Format('Higher Work and distinct blocks count. Need to download BlocksCount:%d  my BlocksCount:%d',[op.OperationBlock.block+1,PascalCoinSafeBox.BlocksCount]));
             end;
           end;
         end;
@@ -1188,7 +1189,7 @@ begin
             tc := TPlatform.GetTickCount;
             if (ReadTcpClientBuffer(MaxWaitTime,HeaderData,ReceiveDataBuffer)) then begin
               iDebugStep := 500;
-              TNetData.NetData.NodeServersAddresses.UpdateNetConnection(Self);
+              PascalNetData.NodeServersAddresses.UpdateNetConnection(Self);
               iDebugStep := 800;
               TLog.NewLog(ltDebug,Classname,'Received '+CT_NetTransferType[HeaderData.header_type]+' operation:'+TNetData.OperationToText(HeaderData.operation)+' id:'+Inttostr(HeaderData.request_id)+' Buffer size:'+Inttostr(HeaderData.buffer_data_length) );
               if (RequestId=HeaderData.request_id) And (HeaderData.header_type=ntp_response) then begin
@@ -1240,7 +1241,7 @@ begin
                     // This will allow to do nothing if not implemented
                     reservedResponse := TMemoryStream.Create;
                     Try
-                      TNetData.NetData.DoProcessReservedAreaMessage(Self,HeaderData,ReceiveDataBuffer,reservedResponse);
+                      PascalNetData.DoProcessReservedAreaMessage(Self,HeaderData,ReceiveDataBuffer,reservedResponse);
                       if (HeaderData.header_type=ntp_request) then begin
                         if (reservedResponse.Size>0) then begin
                           Send(ntp_response,HeaderData.operation,0,HeaderData.request_id,reservedResponse);
@@ -1297,14 +1298,6 @@ begin
   Result := Assigned(FTcpIpClient) And (FTcpIpClient.Connected);
 end;
 
-procedure TNetConnection.Notification(AComponent: TComponent; Operation: TOperation);
-begin
-  inherited;
-  if (Operation=opRemove) And (AComponent = FTcpIpClient) then begin
-    FTcpIpClient := Nil;
-  end;
-end;
-
 function TNetConnection.ReadTcpClientBuffer(MaxWaitMiliseconds: Cardinal; var HeaderData: TNetHeaderData; BufferData: TStream): Boolean;
 var
   auxstream : TMemoryStream;
@@ -1333,7 +1326,7 @@ begin
         FNetProtocolVersion := HeaderData.protocol;
         // Build 1.0.4 accepts net protocol 1 and 2
         if HeaderData.protocol.protocol_version>CT_NetProtocol_Available then begin
-          TNode.Node.NotifyNetClientMessage(Nil,'Detected a higher Net protocol version at '+
+          PascalCoinNode.NotifyNetClientMessage(Nil,'Detected a higher Net protocol version at '+
             ClientRemoteAddr+' (v '+inttostr(HeaderData.protocol.protocol_version)+' '+inttostr(HeaderData.protocol.protocol_available)+') '+
             '... check that your version is Ok! Visit official download website for possible updates: https://sourceforge.net/projects/pascalcoin/');
           DisconnectInvalidClient(false,Format('Invalid Net protocol version found: %d available: %d',[HeaderData.protocol.protocol_version,HeaderData.protocol.protocol_available]));
@@ -1342,7 +1335,7 @@ begin
         end else begin
           if (FNetProtocolVersion.protocol_available>CT_NetProtocol_Available) And (Not FAlertedForNewProtocolAvailable) then begin
             FAlertedForNewProtocolAvailable := true;
-            TNode.Node.NotifyNetClientMessage(Nil,'Detected a new Net protocol version at '+
+            PascalCoinNode.NotifyNetClientMessage(Nil,'Detected a new Net protocol version at '+
               ClientRemoteAddr+' (v '+inttostr(HeaderData.protocol.protocol_version)+' '+inttostr(HeaderData.protocol.protocol_available)+') '+
               '... Visit official download website for possible updates: https://sourceforge.net/projects/pascalcoin/');
           end;
@@ -1405,14 +1398,14 @@ begin
     if Not FHasReceivedData then begin
       FHasReceivedData := true;
       if (Self is TNetClient) then
-        TNetData.NetData.IncStatistics(0,0,0,1,t_bytes_read,0)
-      else TNetData.NetData.IncStatistics(0,0,0,0,t_bytes_read,0);
+        PascalNetData.IncStatistics(0,0,0,1,t_bytes_read,0)
+      else PascalNetData.IncStatistics(0,0,0,0,t_bytes_read,0);
     end else begin
-      TNetData.NetData.IncStatistics(0,0,0,0,t_bytes_read,0);
+      PascalNetData.IncStatistics(0,0,0,0,t_bytes_read,0);
     end;
   end;
   if (Result) And (HeaderData.header_type=ntp_response) then begin
-    TNetData.NetData.UnRegisterRequest(Self,HeaderData.operation,HeaderData.request_id);
+    PascalNetData.UnRegisterRequest(Self,HeaderData.operation,HeaderData.request_id);
   end;
 end;
 
@@ -1482,7 +1475,7 @@ begin
     Finally
       FNetLock.Release;
     End;
-    TNetData.NetData.IncStatistics(0,0,0,0,0,Buffer.Size);
+    PascalNetData.IncStatistics(0,0,0,0,0,Buffer.Size);
   finally
     Buffer.Free;
   end;
@@ -1529,7 +1522,7 @@ begin
         TLog.NewLog(ltdebug,ClassName,Format('Sending %d Operations to %s (inProc:%d, Received:%d)',[FBufferToSendOperations.OperationsCount,ClientRemoteAddr,nOpsToSend,FBufferReceivedOperationsHash.Count]));
         data := TMemoryStream.Create;
         try
-          request_id := TNetData.NetData.NewRequestId;
+          request_id := PascalNetData.NewRequestId;
           c1 := FBufferToSendOperations.OperationsCount;
           data.Write(c1,4);
           for i := 0 to FBufferToSendOperations.OperationsCount-1 do begin
@@ -1558,12 +1551,12 @@ Var data : TMemoryStream;
 begin
   Result := false;
   request_id := 0;
-  if (FRemoteOperationBlock.block<TNetData.NetData.Bank.BlocksCount) Or (FRemoteOperationBlock.block=0) then exit;
+  if (FRemoteOperationBlock.block<PascalCoinSafeBox.BlocksCount) Or (FRemoteOperationBlock.block=0) then exit;
   if Not Connected then exit;
   // First receive operations from
   data := TMemoryStream.Create;
   try
-    if TNetData.NetData.Bank.BlocksCount=0 then c1:=0
+    if PascalCoinSafeBox.BlocksCount=0 then c1:=0
     else c1:=StartAddress;
     if (quantity=0) then begin
       if FRemoteOperationBlock.block>0 then c2 := FRemoteOperationBlock.block
@@ -1575,8 +1568,8 @@ begin
     end;
     data.Write(c1,4);
     data.Write(c2,4);
-    request_id := TNetData.NetData.NewRequestId;
-    TNetData.NetData.RegisterRequest(Self,CT_NetOp_GetBlocks,request_id);
+    request_id := PascalNetData.NewRequestId;
+    PascalNetData.RegisterRequest(Self,CT_NetOp_GetBlocks,request_id);
     TLog.NewLog(ltdebug,ClassName,Format('Send GET BLOCKS start:%d quantity:%d (from:%d to %d)',[StartAddress,quantity,StartAddress,quantity+StartAddress]));
     FIsDownloadingBlocks := quantity>1;
     Send(ntp_request,CT_NetOp_GetBlocks,0,request_id,data);
@@ -1615,21 +1608,21 @@ begin
   data := TMemoryStream.Create;
   try
     if NetTranferType=ntp_request then begin
-      TNetData.NetData.RegisterRequest(Self,CT_NetOp_Hello,request_id);
+      PascalNetData.RegisterRequest(Self,CT_NetOp_Hello,request_id);
     end;
-    If TNode.Node.NetServer.Active then
-      w := TNode.Node.NetServer.Port
+    If PascalCoinNode.NetServer.Active then
+      w := PascalCoinNode.NetServer.Port
     else w := 0;
     // Save active server port (2 bytes). 0 = No active server port
     data.Write(w,2);
     // Save My connection public key
-    TStreamOp.WriteAnsiString(data,TAccountComp.AccountKey2RawString(TNetData.NetData.NodePrivateKey.PublicKey));
+    TStreamOp.WriteAnsiString(data,TAccountComp.AccountKey2RawString(PascalNetData.NodePrivateKey.PublicKey));
     // Save my Unix timestamp (4 bytes)
     currunixtimestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
     data.Write(currunixtimestamp,4);
     // Save last operations block
-    TPCOperationsComp.SaveOperationBlockToStream(TNode.Node.Bank.LastOperationBlock,data);
-    nsarr := TNetData.NetData.NodeServersAddresses.GetValidNodeServers(true,CT_MAX_NODESERVERS_ON_HELLO);
+    TPCOperationsComp.SaveOperationBlockToStream(PascalCoinBank.LastOperationBlock,data);
+    nsarr := PascalNetData.NodeServersAddresses.GetValidNodeServers(true,CT_MAX_NODESERVERS_ON_HELLO);
     i := length(nsarr);
     data.Write(i,4);
     for i := 0 to High(nsarr) do begin
@@ -1641,7 +1634,7 @@ begin
     // Send client version
     TStreamOp.WriteAnsiString(data,CT_ClientAppVersion{$IFDEF LINUX}+'l'{$ELSE}+'w'{$ENDIF}{$IFDEF FPC}{$IFDEF LCL}+'L'{$ELSE}+'F'{$ENDIF}{$ENDIF});
     // Build 1.5 send accumulated work
-    data.Write(TNode.Node.Bank.SafeBox.WorkSum,SizeOf(TNode.Node.Bank.SafeBox.WorkSum));
+    data.Write(PascalCoinSafeBox.WorkSum,SizeOf(PascalCoinSafeBox.WorkSum));
     //
     Send(NetTranferType,CT_NetOp_Hello,0,request_id,data);
     Result := Client.Connected;
@@ -1690,15 +1683,15 @@ begin
       TLog.NewLog(ltDebug,ClassName,'This connection has the same block, does not need to send');
       exit;
     end;
-    if (TNode.Node.Bank.BlocksCount<>NewBlock.OperationBlock.block+1) then begin
-      TLog.NewLog(ltDebug,ClassName,'The block number '+IntToStr(NewBlock.OperationBlock.block)+' is not equal to current blocks stored in bank ('+IntToStr(TNode.Node.Bank.BlocksCount)+'), finalizing');
+    if (PascalCoinSafeBox.BlocksCount<>NewBlock.OperationBlock.block+1) then begin
+      TLog.NewLog(ltDebug,ClassName,'The block number '+IntToStr(NewBlock.OperationBlock.block)+' is not equal to current blocks stored in bank ('+IntToStr(PascalCoinSafeBox.BlocksCount)+'), finalizing');
       exit;
     end;
     data := TMemoryStream.Create;
     try
-      request_id := TNetData.NetData.NewRequestId;
+      request_id := PascalNetData.NewRequestId;
       NewBlock.SaveBlockToStream(false,data);
-      data.Write(TNode.Node.Bank.SafeBox.WorkSum,SizeOf(TNode.Node.Bank.SafeBox.WorkSum));
+      data.Write(PascalCoinSafeBox.WorkSum,SizeOf(PascalCoinSafeBox.WorkSum));
       Send(ntp_autosend,CT_NetOp_NewBlock,0,request_id,data);
     finally
       data.Free;
@@ -1709,6 +1702,7 @@ begin
   Result := Connected;
 end;
 
+// *** Skybuck: CHECK THIS LATER IF THIS METHOD STILL NECESSARY or can be removed ***
 procedure TNetConnection.SetClient(const Value: TNetTcpIpClient);
 Var old : TNetTcpIpClient;
 begin
@@ -1716,23 +1710,23 @@ begin
     if Assigned(FTcpIpClient) then begin
       FTcpIpClient.OnConnect := Nil;
       FTcpIpClient.OnDisconnect := Nil;
-      FTcpIpClient.RemoveFreeNotification(Self);
+//      FTcpIpClient.RemoveFreeNotification(Self);
     end;
-    TNetData.NetData.UnRegisterRequest(Self,0,0);
+    PascalNetData.UnRegisterRequest(Self,0,0);
     old := FTcpIpClient;
     FTcpIpClient := Value;
     if Assigned(old) then begin
-      if old.Owner=Self then begin
+//      if old.Owner=Self then begin
         old.Free;
-      end;
+//      end;
     end;
   end;
   if Assigned(FTcpIpClient) then begin
-    FTcpIpClient.FreeNotification(Self);
+//    FTcpIpClient.FreeNotification(Self);
     FTcpIpClient.OnConnect := TcpClient_OnConnect;
     FTcpIpClient.OnDisconnect := TcpClient_OnDisconnect;
   end;
-  TNetData.NetData.NotifyNetConnectionUpdated;
+  PascalNetData.NotifyNetConnectionUpdated;
 end;
 
 procedure TNetConnection.SetConnected(const Value: Boolean);
@@ -1747,24 +1741,24 @@ end;
 
 procedure TNetConnection.TcpClient_OnConnect(Sender: TObject);
 begin
-  TNetData.NetData.IncStatistics(1,0,1,0,0,0);
+  PascalNetData.IncStatistics(1,0,1,0,0,0);
   TLog.NewLog(ltInfo,Classname,'Connected to a server '+ClientRemoteAddr);
-  TNetData.NetData.NotifyNetConnectionUpdated;
+  PascalNetData.NotifyNetConnectionUpdated;
 end;
 
 procedure TNetConnection.TcpClient_OnDisconnect(Sender: TObject);
 begin
-  if self is TNetServerClient then TNetData.NetData.IncStatistics(-1,-1,0,0,0,0)
+  if self is TNetServerClient then PascalNetData.IncStatistics(-1,-1,0,0,0,0)
   else begin
-    if FHasReceivedData then TNetData.NetData.IncStatistics(-1,0,-1,-1,0,0)
-    else TNetData.NetData.IncStatistics(-1,0,-1,0,0,0);
+    if FHasReceivedData then PascalNetData.IncStatistics(-1,0,-1,-1,0,0)
+    else PascalNetData.IncStatistics(-1,0,-1,0,0,0);
   end;
   TLog.NewLog(ltInfo,Classname,'Disconnected from '+ClientRemoteAddr);
-  TNetData.NetData.NotifyNetConnectionUpdated;
+  PascalNetData.NotifyNetConnectionUpdated;
   if (FClientTimestampIp<>'') then begin
-    TNetData.NetData.NetworkAdjustedTime.RemoveIp(FClientTimestampIp);
+    PascalNetData.NetworkAdjustedTime.RemoveIp(FClientTimestampIp);
   end;
 end;
 
-
 end.
+

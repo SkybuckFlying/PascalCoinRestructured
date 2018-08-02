@@ -1,16 +1,15 @@
-unit UPCBank;
+unit UPascalCoinBank;
 
 interface
 
 uses
-  Classes, UStorage, UPCSafeBox, UPCOperationsComp, UOperationBlock, UPCBankLog, UThread, UStorageClass, UBlockAccount, ULog;
+  Classes, UStorage, UPCOperationsComp, UOperationBlock, UPCBankLog, UThread, UStorageClass, UBlockAccount, ULog;
 
 type
   { TPCBank }
-  TPCBank = Class(TComponent)
+  TPCBank = Class
   private
     FStorage : TStorage;
-    FSafeBox: TPCSafeBox;
     FLastBlockCache : TPCOperationsComp;
     FLastOperationBlock: TOperationBlock;
     FIsRestoringFromFile: Boolean;
@@ -22,17 +21,13 @@ type
     function GetStorage: TStorage;
     procedure SetStorageClass(const Value: TStorageClass);
   public
-    Constructor Create(AOwner: TComponent); Override;
+    Constructor Create;
     Destructor Destroy; Override;
-    Function BlocksCount: Cardinal;
-    Function AccountsCount : Cardinal;
-    procedure AssignTo(Dest: TPersistent); Override;
     function GetActualTargetSecondsAverage(BackBlocks : Cardinal): Real;
     function GetTargetSecondsAverage(FromBlock,BackBlocks : Cardinal): Real;
     function LoadBankFromStream(Stream : TStream; useSecureLoad : Boolean; var errors : AnsiString) : Boolean;
     Procedure Clear;
     Function LoadOperations(Operations : TPCOperationsComp; Block : Cardinal) : Boolean;
-    Property SafeBox : TPCSafeBox read FSafeBox;
     Function AddNewBlockChainBlock(Operations: TPCOperationsComp; MaxAllowedTimestamp : Cardinal; var newBlock: TBlockAccount; var errors: AnsiString): Boolean;
     Procedure DiskRestoreFromOperations(max_block : Int64);
     Procedure UpdateValuesFromSafebox;
@@ -55,14 +50,9 @@ var
 implementation
 
 uses
-  SysUtils, UCrypto, UPCBankNotify, UConst;
+  SysUtils, UCrypto, UPCBankNotify, UConst, UPascalCoinSafeBox;
 
 { TPCBank }
-
-function TPCBank.AccountsCount: Cardinal;
-begin
-  Result := FSafeBox.AccountsCount;
-end;
 
 function TPCBank.AddNewBlockChainBlock(Operations: TPCOperationsComp; MaxAllowedTimestamp : Cardinal; var newBlock: TBlockAccount; var errors: AnsiString): Boolean;
 Var
@@ -92,7 +82,7 @@ begin
         exit;
       end;
 
-      newBlock := SafeBox.Block(SafeBox.BlocksCount-1);
+      newBlock := PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-1);
 
       // Initialize values
       FLastOperationBlock := Operations.OperationBlock;
@@ -102,11 +92,11 @@ begin
           [ Operations.OperationBlock.block,Operations.OperationBlock.nonce,Operations.OperationBlock.timestamp,
             Operations.Count,
             Operations.OperationBlock.fee,
-            SafeBox.TotalBalance,
+            PascalCoinSafeBox.TotalBalance,
             Operations.SafeBoxTransaction.TotalBalance,
             TCrypto.ToHexaString(Operations.OperationBlock.proof_of_work),
             TCrypto.ToHexaString(Operations.OperationBlock.initial_safe_box_hash),
-            TCrypto.ToHexaString(SafeBox.SafeBoxHash)]));
+            TCrypto.ToHexaString(PascalCoinSafeBox.SafeBoxHash)]));
       // Save Operations to disk
       if Not FIsRestoringFromFile then begin
         Storage.SaveBlockChainBlock(Operations);
@@ -130,37 +120,16 @@ begin
   end;
 end;
 
-procedure TPCBank.AssignTo(Dest: TPersistent);
-var d : TPCBank;
-begin
-  if (Not (Dest is TPCBank)) then begin
-    inherited;
-    exit;
-  end;
-  if (Self=Dest) then exit;
-
-  d := TPCBank(Dest);
-  d.SafeBox.CopyFrom(SafeBox);
-  d.FLastOperationBlock := FLastOperationBlock;
-  d.FIsRestoringFromFile := FIsRestoringFromFile;
-  d.FLastBlockCache.CopyFrom( FLastBlockCache );
-end;
-
-function TPCBank.BlocksCount: Cardinal;
-begin
-  Result := SafeBox.BlocksCount;
-end;
-
 procedure TPCBank.Clear;
 begin
-  SafeBox.Clear;
+  PascalCoinSafeBox.Clear;
   FLastOperationBlock := TPCOperationsComp.GetFirstBlock;
   FLastOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash); // Genesis hash
   FLastBlockCache.Clear(true);
   NewLog(Nil, ltupdate, 'Clear Bank');
 end;
 
-constructor TPCBank.Create(AOwner: TComponent);
+constructor TPCBank.Create;
 begin
   inherited;
   FStorage := Nil;
@@ -168,7 +137,7 @@ begin
   FBankLock := TPCCriticalSection.Create('TPCBank_BANKLOCK');
   FIsRestoringFromFile := False;
   FOnLog := Nil;
-  FSafeBox := TPCSafeBox.Create;
+  PascalCoinSafeBox := TPCSafeBox.Create;
   FNotifyList := TList.Create;
   FLastBlockCache := TPCOperationsComp.Create;
   FIsRestoringFromFile:=False;
@@ -187,7 +156,7 @@ begin
     step := 'Destroying LastBlockCache';
     FreeAndNil(FLastBlockCache);
     step := 'Destroying SafeBox';
-    FreeAndNil(FSafeBox);
+    FreeAndNil(PascalCoinSafeBox);
     step := 'Destroying NotifyList';
     FreeAndNil(FNotifyList);
     step := 'Destroying Storage';
@@ -224,29 +193,29 @@ begin
       else n := Storage.LastBlock;
       Storage.RestoreBank(n);
       // Restore last blockchain
-      if (BlocksCount>0) And (SafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
-        if Not Storage.LoadBlockChainBlock(FLastBlockCache,BlocksCount-1) then begin
-          NewLog(nil,lterror,'Cannot find blockchain '+inttostr(BlocksCount-1)+' so cannot accept bank current block '+inttostr(BlocksCount));
+      if (PascalCoinSafeBox.BlocksCount>0) And (PascalCoinSafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
+        if Not Storage.LoadBlockChainBlock(FLastBlockCache,PascalCoinSafeBox.BlocksCount-1) then begin
+          NewLog(nil,lterror,'Cannot find blockchain '+inttostr(PascalCoinSafeBox.BlocksCount-1)+' so cannot accept bank current block '+inttostr(PascalCoinSafeBox.BlocksCount));
           Clear;
         end else begin
           FLastOperationBlock := FLastBlockCache.OperationBlock;
         end;
       end;
-      NewLog(Nil, ltinfo,'Start restoring from disk operations (Max '+inttostr(max_block)+') BlockCount: '+inttostr(BlocksCount)+' Orphan: ' +Storage.Orphan);
+      NewLog(Nil, ltinfo,'Start restoring from disk operations (Max '+inttostr(max_block)+') BlockCount: '+inttostr(PascalCoinSafeBox.BlocksCount)+' Orphan: ' +Storage.Orphan);
 
       Operations := TPCOperationsComp.Create;
       try
-        while ((BlocksCount<=max_block)) do begin
-          if Storage.BlockExists(BlocksCount) then begin
-            if Storage.LoadBlockChainBlock(Operations,BlocksCount) then begin
+        while ((PascalCoinSafeBox.BlocksCount<=max_block)) do begin
+          if Storage.BlockExists(PascalCoinSafeBox.BlocksCount) then begin
+            if Storage.LoadBlockChainBlock(Operations,PascalCoinSafeBox.BlocksCount) then begin
               SetLength(errors,0);
               if Not AddNewBlockChainBlock(Operations,0,newBlock,errors) then begin
-                NewLog(Operations, lterror,'Error restoring block: ' + Inttostr(BlocksCount)+ ' Errors: ' + errors);
-                Storage.DeleteBlockChainBlocks(BlocksCount);
+                NewLog(Operations, lterror,'Error restoring block: ' + Inttostr(PascalCoinSafeBox.BlocksCount)+ ' Errors: ' + errors);
+                Storage.DeleteBlockChainBlocks(PascalCoinSafeBox.BlocksCount);
                 break;
               end else begin
                 // To prevent continuous saving...
-                If (BlocksCount MOD (CT_BankToDiskEveryNBlocks*10))=0 then begin
+                If (PascalCoinSafeBox.BlocksCount MOD (CT_BankToDiskEveryNBlocks*10))=0 then begin
                   Storage.SaveBank;
                 end;
               end;
@@ -257,7 +226,7 @@ begin
       finally
         Operations.Free;
       end;
-      NewLog(Nil, ltinfo,'End restoring from disk operations (Max '+inttostr(max_block)+') Orphan: ' + Storage.Orphan+' Restored '+Inttostr(BlocksCount)+' blocks');
+      NewLog(Nil, ltinfo,'End restoring from disk operations (Max '+inttostr(max_block)+') Orphan: ' + Storage.Orphan+' Restored '+Inttostr(PascalCoinSafeBox.BlocksCount)+' blocks');
     finally
       FIsRestoringFromFile := False;
       FUpgradingToV2 := false;
@@ -279,12 +248,12 @@ begin
       FLastBlockCache.Clear(True);
       FLastOperationBlock := TPCOperationsComp.GetFirstBlock;
       FLastOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash); // Genesis hash
-      If FSafeBox.BlocksCount>0 then begin
+      If PascalCoinSafeBox.BlocksCount>0 then begin
         Storage.Initialize;
-        If Storage.LoadBlockChainBlock(FLastBlockCache,FSafeBox.BlocksCount-1) then begin
+        If Storage.LoadBlockChainBlock(FLastBlockCache,PascalCoinSafeBox.BlocksCount-1) then begin
           FLastOperationBlock := FLastBlockCache.OperationBlock;
         end else begin
-          aux := 'Cannot read last operations block '+IntToStr(FSafeBox.BlocksCount-1)+' from blockchain';
+          aux := 'Cannot read last operations block '+IntToStr(PascalCoinSafeBox.BlocksCount-1)+' from blockchain';
           TLog.NewLog(lterror,ClassName,aux);
           Raise Exception.Create(aux);
         end;
@@ -303,13 +272,13 @@ end;
 function TPCBank.GetActualTargetSecondsAverage(BackBlocks: Cardinal): Real;
 Var ts1, ts2: Int64;
 begin
-  if BlocksCount>BackBlocks then begin
-    ts1 := SafeBox.Block(BlocksCount-1).blockchainInfo.timestamp;
-    ts2 := SafeBox.Block(BlocksCount-BackBlocks-1).blockchainInfo.timestamp;
-  end else if (BlocksCount>1) then begin
-    ts1 := SafeBox.Block(BlocksCount-1).blockchainInfo.timestamp;
-    ts2 := SafeBox.Block(0).blockchainInfo.timestamp;
-    BackBlocks := BlocksCount-1;
+  if PascalCoinSafeBox.BlocksCount>BackBlocks then begin
+    ts1 := PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-1).blockchainInfo.timestamp;
+    ts2 := PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-BackBlocks-1).blockchainInfo.timestamp;
+  end else if (PascalCoinSafeBox.BlocksCount>1) then begin
+    ts1 := PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-1).blockchainInfo.timestamp;
+    ts2 := PascalCoinSafeBox.Block(0).blockchainInfo.timestamp;
+    BackBlocks := PascalCoinSafeBox.BlocksCount-1;
   end else begin
     Result := 0;
     exit;
@@ -320,16 +289,16 @@ end;
 function TPCBank.GetTargetSecondsAverage(FromBlock, BackBlocks: Cardinal): Real;
 Var ts1, ts2: Int64;
 begin
-  If FromBlock>=BlocksCount then begin
+  If FromBlock>=PascalCoinSafeBox.BlocksCount then begin
     Result := 0;
     exit;
   end;
   if FromBlock>BackBlocks then begin
-    ts1 := SafeBox.Block(FromBlock-1).blockchainInfo.timestamp;
-    ts2 := SafeBox.Block(FromBlock-BackBlocks-1).blockchainInfo.timestamp;
+    ts1 := PascalCoinSafeBox.Block(FromBlock-1).blockchainInfo.timestamp;
+    ts2 := PascalCoinSafeBox.Block(FromBlock-BackBlocks-1).blockchainInfo.timestamp;
   end else if (FromBlock>1) then begin
-    ts1 := SafeBox.Block(FromBlock-1).blockchainInfo.timestamp;
-    ts2 := SafeBox.Block(0).blockchainInfo.timestamp;
+    ts1 := PascalCoinSafeBox.Block(FromBlock-1).blockchainInfo.timestamp;
+    ts2 := PascalCoinSafeBox.Block(0).blockchainInfo.timestamp;
     BackBlocks := FromBlock-1;
   end else begin
     Result := 0;
@@ -342,7 +311,7 @@ function TPCBank.GetStorage: TStorage;
 begin
   if Not Assigned(FStorage) then begin
     if Not Assigned(FStorageClass) then raise Exception.Create('StorageClass not defined');
-    FStorage := FStorageClass.Create(Self);
+    FStorage := FStorageClass.Create;
   end;
   Result := FStorage;
 end;
@@ -375,12 +344,12 @@ begin
     TPCThread.ProtectEnterCriticalSection(Self,FBankLock);
     try
       If Assigned(auxSB) then begin
-        SafeBox.CopyFrom(auxSB);
+        PascalCoinSafeBox.CopyFrom(auxSB);
       end else begin
-        Result := SafeBox.LoadSafeBoxFromStream(Stream,false,LastReadBlock,errors);
+        Result := PascalCoinSafeBox.LoadSafeBoxFromStream(Stream,false,LastReadBlock,errors);
       end;
       If Not Result then exit;
-      If SafeBox.BlocksCount>0 then FLastOperationBlock := SafeBox.Block(SafeBox.BlocksCount-1).blockchainInfo
+      If PascalCoinSafeBox.BlocksCount>0 then FLastOperationBlock := PascalCoinSafeBox.Block(PascalCoinSafeBox.BlocksCount-1).blockchainInfo
       else begin
         FLastOperationBlock := TPCOperationsComp.GetFirstBlock;
         FLastOperationBlock.initial_safe_box_hash := TCrypto.DoSha256(CT_Genesis_Magic_String_For_Old_Block_Hash); // Genesis hash

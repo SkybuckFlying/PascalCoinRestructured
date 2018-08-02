@@ -48,7 +48,7 @@ type
     Sender, Logtext : AnsiString
   End;
 
-  TLog = Class(TComponent)
+  TLog = Class
   private
     FLogDataList : TThreadList;
     FOnNewLog: TNewLogEvent;
@@ -63,7 +63,7 @@ type
   protected
     Procedure DoLog(logtype : TLogType; sender, logtext : AnsiString); virtual;
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor Destroy; override;
     Class Procedure NewLog(logtype : TLogType; Const sender, logtext : String);
     Property OnInThreadNewLog : TNewLogEvent read FOnInThreadNewLog write FOnInThreadNewLog;
@@ -89,7 +89,7 @@ Type PLogData = ^TLogData;
 
 { TLog }
 
-constructor TLog.Create(AOwner: TComponent);
+constructor TLog.Create;
 begin
   FLock := TCriticalSection.Create;
   FProcessGlobalLogs := true;

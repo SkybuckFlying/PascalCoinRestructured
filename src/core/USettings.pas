@@ -125,7 +125,7 @@ uses
 
 class procedure TSettings.Load;
 begin
-  FAppParams := TAppParams.Create(nil);
+  FAppParams := TAppParams.Create;
   FAppParams.FileName := TFolderHelper.GetPascalCoinDataFolder+PathDelim+'AppParams.prm';
 end;
 

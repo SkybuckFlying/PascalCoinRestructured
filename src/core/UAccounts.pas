@@ -20,7 +20,7 @@ unit UAccounts;
 interface
 
 uses
-  Classes, UConst, UCrypto, SyncObjs, UThread, UOperationBlock, UOrderedRawList, UAccountPreviousBlockInfo, UAccountKey, UAccountState, UAccount, UAccountInfo, UPCSafeBox, UBlockAccount, UPCSafeBoxHeader;
+  Classes, UConst, UCrypto, SyncObjs, UThread, UOperationBlock, UOrderedRawList, UAccountPreviousBlockInfo, UAccountKey, UAccountState, UAccount, UAccountInfo, UPascalCoinSafeBox, UBlockAccount, UPCSafeBoxHeader;
 {$I config.inc}
 
 Type

@@ -1,4 +1,4 @@
-unit UPCSafeBox;
+unit UPascalCoinSafeBox;
 
 interface
 
@@ -99,6 +99,9 @@ type
 
 function Check_Safebox_Names_Consistency(sb : TPCSafeBox; const title :String; var errors : AnsiString) : Boolean;
 Procedure Check_Safebox_Integrity(sb : TPCSafebox; title: String);
+
+var
+  PascalCoinSafeBox : TPCSafeBox;
 
 implementation
 

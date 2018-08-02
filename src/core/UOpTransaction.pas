@@ -294,7 +294,7 @@ Type
 implementation
 
 uses
-  SysUtils, UConst, ULog, UTxMultiOperation, UStreamOp, UMultiOpChangeInfo, UAccount, UAccountComp, UPCSafeBox, UMultiOpSender, UMultiOpReceiver, UAccountState, UAccountInfo;
+  SysUtils, UConst, ULog, UTxMultiOperation, UStreamOp, UMultiOpChangeInfo, UAccount, UAccountComp, UPascalCoinSafeBox, UMultiOpSender, UMultiOpReceiver, UAccountState, UAccountInfo;
 
 { TOpChangeAccountInfo }
 

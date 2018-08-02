@@ -84,7 +84,7 @@ implementation
 {$ENDIF}
 
 uses
-  UOrderedCardinalList, UAccount, UAccountComp, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UOpChangeAccountInfoType, UPCBank;
+  UOrderedCardinalList, UAccount, UAccountComp, UMultiOpSender, UMultiOpReceiver, UMultiOpChangeInfo, UOpChangeAccountInfoType, UPascalCoinBank, UPascalCoinSafeBox;
 
 { TRandomGenerateOperation }
 
@@ -158,7 +158,7 @@ class function TRandomGenerateOperation.GenerateOpMultiOperation(const operation
      // value N never used.
      n := 0;
      For i:=0 to High(opMulti.Data.txSenders) do begin
-       j := aWalletKeys.IndexOfAccountKey(PascalCoinBank.SafeBox.Account(opMulti.Data.txSenders[i].Account).accountInfo.accountKey);
+       j := aWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(opMulti.Data.txSenders[i].Account).accountInfo.accountKey);
        If (j>=0) then begin
          // Can sign
          If (Assigned(aWalletKeys.Key[j].PrivateKey)) then begin
@@ -167,7 +167,7 @@ class function TRandomGenerateOperation.GenerateOpMultiOperation(const operation
        end;
      end;
      For i:=0 to High(opMulti.Data.changesInfo) do begin
-       j := aWalletKeys.IndexOfAccountKey(PascalCoinBank.SafeBox.Account(opMulti.Data.changesInfo[i].Account).accountInfo.accountKey);
+       j := aWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(opMulti.Data.changesInfo[i].Account).accountInfo.accountKey);
        If (j>=0) then begin
          // Can sign
          If (Assigned(aWalletKeys.Key[j].PrivateKey)) then begin
@@ -261,8 +261,7 @@ begin
   FSourceWalletKeys := Nil;
   FIsProcessingRandomOperations := False;
   FStopRandomOperations := True;
-  FBankNotify := TPCBankNotify.Create(Nil);
-  FBankNotify.OnNewBlock:=OnBankNewBlock;
+  FBankNotify := TPCBankNotify.Create; // (Nil);
   FCurrOperationsComp := TPCOperationsComp.Create;
   mLogs.Clear;
 end;
@@ -301,10 +300,8 @@ end;
 procedure TFRMRandomOperations.SetSourceNode(AValue: TNode);
 begin
   if FSourceNode=AValue then Exit;
-  FBankNotify.Bank := Nil;
   FSourceNode:=AValue;
   If Assigned(AValue) then begin
-    FBankNotify.Bank := AValue.Bank;
   end;
 end;
 
@@ -372,7 +369,7 @@ end;
 
 procedure TFRMRandomOperations.OnBankNewBlock(Sender: TObject);
 begin
-  NewLog(Format('Updating to new block %d',[FBankNotify.Bank.BlocksCount]));
+  NewLog(Format('Updating to new block %d',[PascalCoinSafeBox.BlocksCount]));
   FCurrOperationsComp.SanitizeOperations;
 end;
 

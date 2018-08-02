@@ -300,9 +300,8 @@ object FRMAbout: TFRMAbout
     Width = 111
     Height = 31
     Caption = 'Close'
-    DoubleBuffered = True
     Kind = bkOK
-    ParentDoubleBuffered = False
+    NumGlyphs = 2
     TabOrder = 1
   end
 end

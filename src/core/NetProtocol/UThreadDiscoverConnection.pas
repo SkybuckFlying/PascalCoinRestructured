@@ -33,19 +33,19 @@ begin
   TLog.NewLog(ltInfo,Classname,'Starting discovery of connection '+FNodeServerAddress.ip+':'+InttoStr(FNodeServerAddress.port));
   DebugStep := 'Locking list';
   // Register attempt
-  If TNetData.NetData.NodeServersAddresses.GetNodeServerAddress(FNodeServerAddress.ip,FNodeServerAddress.port,true,ns) then begin
+  If PascalNetData.NodeServersAddresses.GetNodeServerAddress(FNodeServerAddress.ip,FNodeServerAddress.port,true,ns) then begin
     ns.last_attempt_to_connect := Now;
     inc(ns.total_failed_attemps_to_connect);
-    TNetData.NetData.NodeServersAddresses.SetNodeServerAddress(ns);
+    PascalNetData.NodeServersAddresses.SetNodeServerAddress(ns);
   end;
   DebugStep := 'Synchronizing notify';
   if Terminated then exit;
-  TNetData.NetData.NotifyNodeServersUpdated;
+  PascalNetData.NotifyNodeServersUpdated;
   // Try to connect
   ok := false;
   DebugStep := 'Trying to connect';
   if Terminated then exit;
-  NC := TNetClient.Create(Nil);
+  NC := TNetClient.Create;
   Try
     DebugStep := 'Connecting';
     If NC.ConnectTo(FNodeServerAddress.ip,FNodeServerAddress.port) then begin
@@ -64,7 +64,7 @@ begin
   End;
   DebugStep := 'Synchronizing notify final';
   if Terminated then exit;
-  TNetData.NetData.NotifyNodeServersUpdated;
+  PascalNetData.NotifyNodeServersUpdated;
 end;
 
 constructor TThreadDiscoverConnection.Create(NodeServerAddress: TNodeServerAddress; NotifyOnTerminate : TNotifyEvent);

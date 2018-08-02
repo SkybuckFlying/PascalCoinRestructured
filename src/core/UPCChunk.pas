@@ -37,7 +37,7 @@ var
 implementation
 
 uses
-  UPCSafeBox, UStreamOp, ZLib, {$IFDEF FPC} zStream, {$ENDIF} SysUtils, ULog, UConst;
+  UPascalCoinSafeBox, UStreamOp, ZLib, {$IFDEF FPC} zStream, {$ENDIF} SysUtils, ULog, UConst;
 
 { TPCChunk }
 

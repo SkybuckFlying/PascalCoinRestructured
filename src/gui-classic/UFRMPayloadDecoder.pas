@@ -157,7 +157,7 @@ begin
     If not TPCOperation.DecodeOperationHash(r,nBlock,nAccount,nN_Operation,md160) then begin
       raise Exception.Create('Value is not a valid OPHASH because can''t extract Block/Account/N_Operation info');
     end;
-    Case TNode.Node.FindNOperation(nBlock,nAccount,nN_Operation,opr) of
+    Case PascalCoinNode.FindNOperation(nBlock,nAccount,nN_Operation,opr) of
       invalid_params : raise Exception.Create(Format('Not a valid OpHash searching at Block:%d Account:%d N_Operation:%d',[nBlock,nAccount,nN_Operation]));
       blockchain_block_not_found : raise Exception.Create('Your blockchain file does not contain all blocks to find');
       found : ;

@@ -221,7 +221,7 @@ begin
   ifn := OpenDialog.FileName;
   if Not FileExists(ifn) then raise Exception.Create('Cannot find file '+ifn);
 
-  wki := TWalletKeys.Create(Self);
+  wki := TWalletKeys.Create;
   try
     wki.WalletFileName := ifn;
     if wki.Count<=0 then raise Exception.Create('Wallet file has no valid data');

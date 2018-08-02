@@ -17,7 +17,7 @@ type
 implementation
 
 uses
-  Classes, UOperationBlock, UNetConnection, UNetData, UNode, SysUtils;
+  Classes, UOperationBlock, UNetConnection, UNetData, UPascalCoinBank, SysUtils, UPascalCoinSafeBox;
 
 { TThreadGetNewBlockChainFromClient }
 
@@ -32,14 +32,14 @@ begin
   candidates := TList.Create;
   try
     lop := CT_OperationBlock_NUL;
-    TNetData.NetData.MaxRemoteOperationBlock := CT_OperationBlock_NUL;
+    PascalNetData.MaxRemoteOperationBlock := CT_OperationBlock_NUL;
     // First round: Find by most work
     maxWork := 0;
-    j := TNetData.NetData.ConnectionsCountAll;
+    j := PascalNetData.ConnectionsCountAll;
     nc := Nil;
     for i := 0 to j - 1 do begin
-      if TNetData.NetData.GetConnection(i,nc) then begin
-        if (nc.RemoteAccumulatedWork>maxWork) And (nc.RemoteAccumulatedWork>TNode.Node.Bank.SafeBox.WorkSum) then begin
+      if PascalNetData.GetConnection(i,nc) then begin
+        if (nc.RemoteAccumulatedWork>maxWork) And (nc.RemoteAccumulatedWork>PascalCoinSafeBox.WorkSum) then begin
           maxWork := nc.RemoteAccumulatedWork;
         end;
         // Preventing downloading
@@ -48,7 +48,7 @@ begin
     end;
     if (maxWork>0) then begin
       for i := 0 to j - 1 do begin
-        If TNetData.NetData.GetConnection(i,nc) then begin
+        If PascalNetData.GetConnection(i,nc) then begin
           if (nc.RemoteAccumulatedWork>=maxWork) then begin
             candidates.Add(nc);
             lop := nc.RemoteOperationBlock;
@@ -59,8 +59,8 @@ begin
     // Second round: Find by most height
     if candidates.Count=0 then begin
       for i := 0 to j - 1 do begin
-        if (TNetData.NetData.GetConnection(i,nc)) then begin
-          if (nc.RemoteOperationBlock.block>=TNode.Node.Bank.BlocksCount) And
+        if (PascalNetData.GetConnection(i,nc)) then begin
+          if (nc.RemoteOperationBlock.block>=PascalCoinSafeBox.BlocksCount) And
              (nc.RemoteOperationBlock.block>=lop.block) then begin
              lop := nc.RemoteOperationBlock;
           end;
@@ -68,7 +68,7 @@ begin
       end;
       if (lop.block>0) then begin
         for i := 0 to j - 1 do begin
-          If (TNetData.NetData.GetConnection(i,nc)) then begin
+          If (PascalNetData.GetConnection(i,nc)) then begin
             if (nc.RemoteOperationBlock.block>=lop.block) then begin
                candidates.Add(nc);
             end;
@@ -76,13 +76,13 @@ begin
         end;
       end;
     end;
-    TNetData.NetData.MaxRemoteOperationBlock := lop;
+    PascalNetData.MaxRemoteOperationBlock := lop;
     if (candidates.Count>0) then begin
       // Random a candidate
       i := 0;
       if (candidates.Count>1) then i := Random(candidates.Count); // i = 0..count-1
       nc := TNetConnection(candidates[i]);
-      TNetData.NetData.GetNewBlockChainFromClient(nc,Format('Candidate block: %d sum: %d',[nc.RemoteOperationBlock.block,nc.RemoteAccumulatedWork]));
+      PascalNetData.GetNewBlockChainFromClient(nc,Format('Candidate block: %d sum: %d',[nc.RemoteOperationBlock.block,nc.RemoteAccumulatedWork]));
     end;
   finally
     candidates.Free;

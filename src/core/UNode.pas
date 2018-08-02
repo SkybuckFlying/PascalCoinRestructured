@@ -30,7 +30,7 @@ unit UNode;
 interface
 
 uses
-  Classes, UBlockChain, UNetProtocol, UAccounts, UCrypto, UThread, SyncObjs, ULog, UNetServer, UPCBank, UPCOperationsComp, UPCBankNotify, UOrderedRawList, UNodeServerAddress,
+  Classes, UBlockChain, UNetProtocol, UAccounts, UCrypto, UThread, SyncObjs, ULog, UNetServer, UPascalCoinBank, UPCOperationsComp, UPCBankNotify, UOrderedRawList, UNodeServerAddress,
   UNetConnection, UBlockAccount, UOperationsHashTree, UPCOperation, UOperationResume, UOrderedAccountKeysList, UOperationsResumeList;
 
 {$I config.inc}
@@ -41,13 +41,12 @@ Type
 
   TSearchOperationResult = (found, invalid_params, blockchain_block_not_found);
 
-  TNode = Class(TComponent)
+  TNode = Class
   private
     FNodeLog : TLog;
     FLockNodeOperations : TPCCriticalSection;
     FOperationSequenceLock : TPCCriticalSection;
     FNotifyList : TList;
-    FBank : TPCBank;
     FOperations : TPCOperationsComp;
     FNetServer : TNetServer;
     FBCBankNotify : TPCBankNotify;
@@ -60,16 +59,13 @@ Type
     Procedure OnBankNewBlock(Sender : TObject);
     procedure SetNodeLogFilename(const Value: AnsiString);
     function GetNodeLogFilename: AnsiString;
-  protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
+
   public
-    Class Function Node : TNode;
     Class Function NodeExists : Boolean;
     Class Procedure DecodeIpStringToNodeServerAddressArray(Const Ips : AnsiString; Var NodeServerAddressArray : TNodeServerAddressArray);
     Class Function EncodeNodeServerAddressArrayToIpString(Const NodeServerAddressArray : TNodeServerAddressArray) : AnsiString;
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor Destroy; override;
-    Property Bank : TPCBank read FBank;
     Function NetServer : TNetServer;
     Procedure NotifyNetClientMessage(Sender : TNetConnection; Const TheMessage : AnsiString);
     //
@@ -118,7 +114,6 @@ Type
   { TNodeNotifyEvents is ThreadSafe and will only notify in the main thread }
   TNodeNotifyEvents = Class(TComponent)
   private
-    FNode: TNode;
     FOnKeyActivity: TNotifyEvent;
     FPendingNotificationsList : TPCThreadList;
     FThreadSafeNodeNotifyEvent : TThreadSafeNodeNotifyEvent;
@@ -127,16 +122,12 @@ Type
     FMessages : TStringList;
     FOnNodeMessageEvent: TNodeMessageEvent;
     FWatchKeys: TOrderedAccountKeysList;
-    procedure SetNode(const Value: TNode);
     Procedure NotifyBlocksChanged;
     Procedure NotifyOperationsChanged;
     procedure SetWatchKeys(AValue: TOrderedAccountKeysList);
-  protected
-    procedure Notification(AComponent: TComponent; Operation: TOperation); override;
   public
     Constructor Create(AOwner : TComponent); override;
     Destructor Destroy; override;
-    Property Node : TNode read FNode write SetNode;
     Property OnBlocksChanged : TNotifyEvent read FOnBlocksChanged write FOnBlocksChanged;
     Property OnOperationsChanged : TNotifyEvent read FOnOperationsChanged write FOnOperationsChanged;
     Property OnNodeMessageEvent : TNodeMessageEvent read FOnNodeMessageEvent write FOnNodeMessageEvent;
@@ -169,7 +160,7 @@ var
 
 implementation
 
-Uses UOpTransaction, SysUtils,  UConst, UTime, UOperationBlock, UPtrInt, UNetData, UAccountComp, UPascalCoinProtocol, UAccount;
+Uses UOpTransaction, SysUtils,  UConst, UTime, UOperationBlock, UPtrInt, UNetData, UAccountComp, UPascalCoinProtocol, UAccount, UPascalCoinSafeBox;
 
 { TNode }
 
@@ -193,28 +184,28 @@ begin
   end;
   NewBlockOperations.Lock; // New protection
   Try
-    If NewBlockOperations.OperationBlock.block<>Bank.BlocksCount then begin
-      errors := 'New block number ('+IntToStr(NewBlockOperations.OperationBlock.block)+') not valid! (Expected '+IntToStr(Bank.BlocksCount)+')';
+    If NewBlockOperations.OperationBlock.block<>PascalCoinSafeBox.BlocksCount then begin
+      errors := 'New block number ('+IntToStr(NewBlockOperations.OperationBlock.block)+') not valid! (Expected '+IntToStr(PascalCoinSafeBox.BlocksCount)+')';
       exit;
     end;
     OpBlock := NewBlockOperations.OperationBlock;
     TLog.NewLog(ltdebug,Classname,Format('AddNewBlockChain Connection:%s NewBlock:%s',[
       Inttohex(PtrInt(SenderConnection),8),TPCOperationsComp.OperationBlockToText(OpBlock)]));
     If Not TPCThread.TryProtectEnterCriticalSection(Self,2000,FLockNodeOperations) then begin
-      If NewBlockOperations.OperationBlock.block<>Bank.BlocksCount then exit;
+      If NewBlockOperations.OperationBlock.block<>PascalCoinSafeBox.BlocksCount then exit;
       s := 'Cannot AddNewBlockChain due blocking lock operations node';
       TLog.NewLog(lterror,Classname,s);
       if TThread.CurrentThread.ThreadID=MainThreadID then raise Exception.Create(s) else exit;
     end;
     try
       // Check block number:
-      if TPCOperationsComp.EqualsOperationBlock(Bank.LastOperationBlock,NewBlockOperations.OperationBlock) then begin
+      if TPCOperationsComp.EqualsOperationBlock(PascalCoinBank.LastOperationBlock,NewBlockOperations.OperationBlock) then begin
         errors := 'Duplicated block';
         exit;
       end;
       // Improvement TNode speed 2.1.6
       // Does not need to save a FOperations backup because is Sanitized by "TNode.OnBankNewBlock"
-      Result := Bank.AddNewBlockChainBlock(NewBlockOperations,TNetData.NetData.NetworkAdjustedTime.GetMaxAllowedTimestampForNewBlock,newBlockAccount,errors);
+      Result := PascalCoinBank.AddNewBlockChainBlock(NewBlockOperations,PascalNetData.NetworkAdjustedTime.GetMaxAllowedTimestampForNewBlock,newBlockAccount,errors);
       if Result then begin
         if Assigned(SenderConnection) then begin
           FNodeLog.NotifyNewLog(ltupdate,SenderConnection.ClassName,Format(';%d;%s;%s;;%d;%d;%d;%s',[OpBlock.block,SenderConnection.ClientRemoteAddr,OpBlock.block_payload,
@@ -236,8 +227,8 @@ begin
         opsht := TOperationsHashTree.Create;
         Try
           j := Random(3); // j=0,1 or 2
-          If (Bank.LastBlockFound.OperationBlock.block>j) then
-            minBlockResend:=Bank.LastBlockFound.OperationBlock.block - j
+          If (PascalCoinBank.LastBlockFound.OperationBlock.block>j) then
+            minBlockResend:=PascalCoinBank.LastBlockFound.OperationBlock.block - j
           else minBlockResend:=1;
           maxResend := CT_MaxResendMemPoolOperations;
           i := 0;
@@ -249,7 +240,7 @@ begin
               opsht.AddOperationToHashTree(resendOp);
               // Add to sent operations
               FSentOperations.SetTag(resendOp.Sha256,FOperations.OperationBlock.block); // Set tag new value
-              FSentOperations.Add(FOperations.Operation[i].Sha256,Bank.LastBlockFound.OperationBlock.block);
+              FSentOperations.Add(FOperations.Operation[i].Sha256,PascalCoinBank.LastBlockFound.OperationBlock.block);
             end else begin
               {$IFDEF HIGHLOG}TLog.NewLog(ltInfo,ClassName,'Sanitized operation not included to resend (j:'+IntToStr(j)+'>'+inttostr(minBlockResend)+') ('+inttostr(i+1)+'/'+inttostr(FOperations.Count)+'): '+FOperations.Operation[i].ToString);{$ENDIF}
             end;
@@ -268,7 +259,7 @@ begin
           // Clean sent operations buffer
           j := 0;
           for i := FSentOperations.Count-1 downto 0 do begin
-            If (FSentOperations.GetTag(i)<Bank.LastBlockFound.OperationBlock.block-2) then begin
+            If (FSentOperations.GetTag(i)<PascalCoinBank.LastBlockFound.OperationBlock.block-2) then begin
               FSentOperations.Delete(i);
               inc(j);
             end;
@@ -279,11 +270,11 @@ begin
           TLog.NewLog(ltdebug,ClassName,'Buffer Sent operations: '+IntToStr(FSentOperations.Count));
           // Notify to clients
           {$IFnDEF TESTING_NO_POW_CHECK}
-          j := TNetData.NetData.ConnectionsCountAll;
+          j := PascalNetData.ConnectionsCountAll;
           for i:=0 to j-1 do begin
-            if (TNetData.NetData.GetConnection(i,nc)) then begin
+            if (PascalNetData.GetConnection(i,nc)) then begin
               if (nc<>SenderConnection) And (nc.Connected) then begin
-                TThreadNodeNotifyNewBlock.Create(nc,Bank.LastBlockFound,opsht);
+                TThreadNodeNotifyNewBlock.Create(nc,PascalCoinBank.LastBlockFound,opsht);
               end;
             end;
           end;
@@ -388,7 +379,7 @@ begin
         ActOp := OperationsHashTree.GetOperation(j);
         If (FOperations.OperationsHashTree.IndexOfOperation(ActOp)<0) then begin
           // Protocol 2 limitation: In order to prevent spam of operations without Fee, will protect it
-          If (ActOp.OperationFee=0) And (Bank.SafeBox.CurrentProtocol>=CT_PROTOCOL_2) And
+          If (ActOp.OperationFee=0) And (PascalCoinSafeBox.CurrentProtocol>=CT_PROTOCOL_2) And
              (FOperations.OperationsHashTree.CountOperationsBySameSignerWithoutFee(ActOp.SignerAccount)>=CT_MaxAccountOperationsPerBlockWithoutFee) then begin
             e := Format('Account %s zero fee operations per block limit:%d',[TAccountComp.AccountNumberToAccountTxtNumber(ActOp.SignerAccount),CT_MaxAccountOperationsPerBlockWithoutFee]);
             if (errors<>'') then errors := errors+' ';
@@ -460,7 +451,7 @@ begin
       end;
       // Save operations buffer
       If Result<>0 then begin
-        Bank.Storage.SavePendingBufferOperations(Self.Operations.OperationsHashTree);
+        PascalCoinBank.Storage.SavePendingBufferOperations(Self.Operations.OperationsHashTree);
       end;
     finally
       FLockNodeOperations.Release;
@@ -471,9 +462,9 @@ begin
     end;
     if Result=0 then exit;
     // Send to other nodes
-    j := TNetData.NetData.ConnectionsCountAll;
+    j := PascalNetData.ConnectionsCountAll;
     for i:=0 to j-1 do begin
-      If TNetData.NetData.GetConnection(i,nc) then begin
+      If PascalNetData.GetConnection(i,nc) then begin
         if (nc<>SenderConnection) And (nc.Connected) then TThreadNodeNotifyOperations.Create(nc,valids_operations);
       end;
     end;
@@ -492,17 +483,17 @@ Var i,j : Integer;
 begin
   DecodeIpStringToNodeServerAddressArray(ips+';'+PeerCache,nsarr);
   for i := low(nsarr) to high(nsarr) do begin
-    TNetData.NetData.AddServer(nsarr[i]);
+    PascalNetData.AddServer(nsarr[i]);
   end;
-  j := (CT_MaxServersConnected -  TNetData.NetData.ConnectionsCount(true));
+  j := (CT_MaxServersConnected -  PascalNetData.ConnectionsCount(true));
   if j<=0 then exit;
-  TNetData.NetData.DiscoverServers;
+  PascalNetData.DiscoverServers;
 end;
 
-constructor TNode.Create(AOwner: TComponent);
+constructor TNode.Create;
 begin
   FSentOperations := TOrderedRawList.Create;
-  FNodeLog := TLog.Create(Self);
+  FNodeLog := TLog.Create;
   FNodeLog.ProcessGlobalLogs := false;
 //  RegisterOperationsClass; // Skybuck: should not be needed
   if Assigned(PascalCoinNode) then raise Exception.Create('Duplicate nodes protection');
@@ -511,9 +502,8 @@ begin
   FDisabledsNewBlocksCount := 0;
   FLockNodeOperations := TPCCriticalSection.Create('TNode_LockNodeOperations');
   FOperationSequenceLock := TPCCriticalSection.Create('TNode_OperationSequenceLock');
-  FBank := TPCBank.Create(Self);
-  FBCBankNotify := TPCBankNotify.Create(Self);
-  FBCBankNotify.Bank := FBank;
+  PascalCoinBank := TPCBank.Create;
+  FBCBankNotify := TPCBankNotify.Create;
   FBCBankNotify.OnNewBlock := OnBankNewBlock;
   FNetServer := TNetServer.Create;
   FOperations := TPCOperationsComp.Create;
@@ -598,7 +588,7 @@ begin
 
     step := 'Destroying Bank';
     FreeAndNil(FBCBankNotify);
-    FreeAndNil(FBank);
+    FreeAndNil(PascalCoinBank);
     {$IFDEF BufferOfFutureOperations}
     FreeAndNil(FBufferAuxWaitingOperations);
     {$ENDIF}
@@ -658,15 +648,15 @@ function TNode.IsBlockChainValid(var WhyNot : AnsiString): Boolean;
 Var unixtimediff : Integer;
 begin
   Result :=false;
-  if (TNetData.NetData.NetStatistics.ActiveConnections<=0)  then begin
+  if (PascalNetData.NetStatistics.ActiveConnections<=0)  then begin
     WhyNot := 'No connection to check blockchain';
     exit;
   end;
-  if (Bank.LastOperationBlock.block<=0) then begin
+  if (PascalCoinBank.LastOperationBlock.block<=0) then begin
     WhyNot := 'No blockchain';
     exit;
   end;
-  unixtimediff := UnivDateTimeToUnix(DateTime2UnivDateTime(Now)) - Bank.LastOperationBlock.timestamp;
+  unixtimediff := UnivDateTimeToUnix(DateTime2UnivDateTime(Now)) - PascalCoinBank.LastOperationBlock.timestamp;
   If (unixtimediff<0) then begin
     WhyNot := 'Invalid Last Block Time';
     exit;
@@ -682,13 +672,13 @@ function TNode.IsReady(Var CurrentProcess: AnsiString): Boolean;
 begin
   Result := false;
   CurrentProcess := '';
-  if FBank.IsReady(CurrentProcess) then begin
+  if PascalCoinBank.IsReady(CurrentProcess) then begin
     if FNetServer.Active then begin
-      if TNetData.NetData.IsGettingNewBlockChainFromClient then begin
-        CurrentProcess := 'Obtaining valid BlockChain - Found block '+inttostr(TNetData.NetData.MaxRemoteOperationBlock.block);
+      if PascalNetData.IsGettingNewBlockChainFromClient then begin
+        CurrentProcess := 'Obtaining valid BlockChain - Found block '+inttostr(PascalNetData.MaxRemoteOperationBlock.block);
       end else begin
-        if TNetData.NetData.MaxRemoteOperationBlock.block>FOperations.OperationBlock.block then begin
-          CurrentProcess := 'Found block '+inttostr(TNetData.NetData.MaxRemoteOperationBlock.block)+' (Wait until downloaded)';
+        if PascalNetData.MaxRemoteOperationBlock.block>FOperations.OperationBlock.block then begin
+          CurrentProcess := 'Found block '+inttostr(PascalNetData.MaxRemoteOperationBlock.block)+' (Wait until downloaded)';
         end else begin
           Result := true;
         end;
@@ -704,20 +694,9 @@ begin
   Result := FNetServer;
 end;
 
-class function TNode.Node: TNode;
-begin
-  if not assigned(PascalCoinNode) then PascalCoinNode := TNode.Create(Nil);
-  Result := PascalCoinNode;
-end;
-
 class function TNode.NodeExists: Boolean;
 begin
   Result := Assigned(PascalCoinNode);
-end;
-
-procedure TNode.Notification(AComponent: TComponent; Operation: TOperation);
-begin
-  inherited;
 end;
 
 procedure TNode.NotifyBlocksChanged;
@@ -756,7 +735,7 @@ procedure TNode.GetStoredOperationsFromAccount(const OperationsResume: TOperatio
           found_in_block := False;
           last_block_number := block_number;
           l.Clear;
-          If not Bank.Storage.LoadBlockChainBlock(opc,block_number) then begin
+          If not PascalCoinBank.Storage.LoadBlockChainBlock(opc,block_number) then begin
             TLog.NewLog(ltdebug,ClassName,'Block '+inttostr(block_number)+' not found. Cannot read operations');
             exit;
           end;
@@ -831,9 +810,9 @@ Var acc : TAccount;
   lastBalance : Int64;
 begin
   if MaxDepth<0 then Exit;
-  if account_number>=Bank.SafeBox.AccountsCount then Exit;
+  if account_number>=PascalCoinSafeBox.AccountsCount then Exit;
   if StartOperation>EndOperation then Exit;
-  acc := Bank.SafeBox.Account(account_number);
+  acc := PascalCoinSafeBox.Account(account_number);
   if (acc.updated_block>0) Or (acc.account=0) then Begin
     if (SearchBackwardsStartingAtBlock=0) Or (SearchBackwardsStartingAtBlock>=acc.updated_block) then begin
       startBlock := acc.updated_block;
@@ -873,8 +852,8 @@ begin
   OpResumeList.Clear;
   Result := invalid_params;
   block := start_block;
-  If (block>=Bank.BlocksCount) then exit; // Invalid block number
-  If (account>=Bank.AccountsCount) then exit; // Invalid account number
+  If (block>=PascalCoinSafeBox.BlocksCount) then exit; // Invalid block number
+  If (account>=PascalCoinSafeBox.AccountsCount) then exit; // Invalid account number
   If (n_operation_high<n_operation_low) then exit;
   n_operation := Operations.SafeBoxTransaction.Account(account).n_operation;
   if (n_operation>n_operation_high) then n_operation := n_operation_high;
@@ -900,7 +879,7 @@ begin
           end;
         end;
       end;
-      block := Bank.SafeBox.Account(account).updated_block;
+      block := PascalCoinSafeBox.Account(account).updated_block;
     finally
       Operations.Unlock;
     end;
@@ -910,7 +889,7 @@ begin
   Try
     While (n_operation>0) And (n_operation>=n_operation_low) And (block>0) do begin
       aux_block := block;
-      If Not Bank.LoadOperations(OperationComp,block) then begin
+      If Not PascalCoinBank.LoadOperations(OperationComp,block) then begin
         Result := blockchain_block_not_found; // Cannot continue searching!
         exit;
       end;
@@ -921,7 +900,7 @@ begin
             Or
             (n_operation_high>n_operation_low) and (op.GetAccountN_Operation(account)<=n_operation) and (op.GetAccountN_Operation(account)>=n_operation_low) and (op.GetAccountN_Operation(account)<=n_operation_high) then begin
             TPCOperation.OperationToOperationResume(block,op,True,account,opr);
-            opr.time:=Bank.SafeBox.Block(block).blockchainInfo.timestamp;
+            opr.time:=PascalCoinSafeBox.Block(block).blockchainInfo.timestamp;
             opr.NOpInsideBlock:=i;
             opr.Balance:=-1;
             OpResumeList.Add(opr);
@@ -957,11 +936,11 @@ var opht : TOperationsHashTree;
   errors : AnsiString;
   n : Integer;
 begin
-  Bank.DiskRestoreFromOperations(max_block_to_read);
+  PascalCoinBank.DiskRestoreFromOperations(max_block_to_read);
   opht := TOperationsHashTree.Create;
   oprl := TOperationsResumeList.Create;
   try
-    Bank.Storage.LoadPendingBufferOperations(opht); // New Build 2.1.4 to load pending operations buffer
+    PascalCoinBank.Storage.LoadPendingBufferOperations(opht); // New Build 2.1.4 to load pending operations buffer
     n := AddOperations(Nil,opht,oprl,errors);
     TLog.NewLog(ltInfo,ClassName,Format('Pending buffer restored operations:%d added:%d final_operations:%d errors:%s',[opht.OperationsCount,n,Operations.OperationsHashTree.OperationsCount,errors]));
   finally
@@ -986,7 +965,7 @@ begin
   If not TPCOperation.DecodeOperationHash(OperationHash,block,account,n_operation,md160) then exit;
   initial_block := block;
   //
-  If (account>=Bank.AccountsCount) then exit; // Invalid account number
+  If (account>=PascalCoinSafeBox.AccountsCount) then exit; // Invalid account number
   // If block=0 then we must search in pending operations first
   if (block=0) then begin
     FOperations.Lock;
@@ -997,7 +976,7 @@ begin
           opHashValid := TPCOperation.OperationHashValid(op,0);
           opHash_OLD := TPCOperation.OperationHash_OLD(op,0);
           If (opHashValid=OperationHash) or
-            ((FBank.BlocksCount<CT_Protocol_Upgrade_v2_MinBlock) And (opHash_OLD=OperationHash)) then begin
+            ((PascalCoinSafeBox.BlocksCount<CT_Protocol_Upgrade_v2_MinBlock) And (opHash_OLD=OperationHash)) then begin
             operation_block_index:=i;
             OperationComp.CopyFrom(FOperations);
             Result := found;
@@ -1009,14 +988,14 @@ begin
       FOperations.Unlock;
     end;
     // block=0 and not found... start searching at block updated by account updated_block
-    block := Bank.SafeBox.Account(account).updated_block;
-    if Bank.SafeBox.Account(account).n_operation<n_operation then exit; // n_operation is greater than found in safebox
+    block := PascalCoinSafeBox.Account(account).updated_block;
+    if PascalCoinSafeBox.Account(account).n_operation<n_operation then exit; // n_operation is greater than found in safebox
   end;
-  if (block=0) or (block>=Bank.BlocksCount) then exit;
+  if (block=0) or (block>=PascalCoinSafeBox.BlocksCount) then exit;
   // Search in previous blocks
   While (block>0) do begin
     aux_block := block;
-    If Not Bank.LoadOperations(OperationComp,block) then begin
+    If Not PascalCoinBank.LoadOperations(OperationComp,block) then begin
       Result := blockchain_block_not_found;
       exit;
     end;
@@ -1092,14 +1071,14 @@ begin
     if assigned(Target) then begin
       Target.Send_Message(TheMessage);
     end else begin
-      j := TNetData.NetData.ConnectionsCountAll;
+      j := PascalNetData.ConnectionsCountAll;
       for i:=0 to j-1 do begin
-        if TNetData.NetData.GetConnection(i,nc) then begin
-          If TNetData.NetData.ConnectionLock(Self,nc,500) then begin
+        if PascalNetData.GetConnection(i,nc) then begin
+          If PascalNetData.ConnectionLock(Self,nc,500) then begin
             try
               nc.Send_Message(TheMessage);
             finally
-              TNetData.NetData.ConnectionUnlock(nc)
+              PascalNetData.ConnectionUnlock(nc)
             end;
           end;
         end;
@@ -1130,25 +1109,16 @@ begin
   FPendingNotificationsList := TPCThreadList.Create('TNodeNotifyEvents_PendingNotificationsList');
   FThreadSafeNodeNotifyEvent := TThreadSafeNodeNotifyEvent.Create(Self);
   FThreadSafeNodeNotifyEvent.FreeOnTerminate := true; // This is to prevent locking when freeing component
-  Node := PascalCoinNode;
 end;
 
 destructor TNodeNotifyEvents.Destroy;
 begin
-  if Assigned(FNode) then FNode.FNotifyList.Remove(Self);
+  if Assigned(PascalCoinNode) then PascalCoinNode.FNotifyList.Remove(Self);
   FThreadSafeNodeNotifyEvent.FNodeNotifyEvents := Nil;
   FThreadSafeNodeNotifyEvent.Terminate;
   FreeAndNil(FPendingNotificationsList);
   FreeAndNil(FMessages);
   inherited;
-end;
-
-procedure TNodeNotifyEvents.Notification(AComponent: TComponent; Operation: TOperation);
-begin
-  inherited;
-  if (Operation=opremove) then begin
-    if AComponent=FNode then FNode := Nil;
-  end;
 end;
 
 procedure TNodeNotifyEvents.NotifyBlocksChanged;
@@ -1165,20 +1135,6 @@ procedure TNodeNotifyEvents.SetWatchKeys(AValue: TOrderedAccountKeysList);
 begin
   if FWatchKeys=AValue then Exit;
   FWatchKeys:=AValue;
-end;
-
-procedure TNodeNotifyEvents.SetNode(const Value: TNode);
-begin
-  if FNode=Value then exit;
-  if Assigned(FNode) then begin
-    FNode.RemoveFreeNotification(Self);
-    FNode.FNotifyList.Remove(Self);
-  end;
-  FNode := Value;
-  if Assigned(FNode) then begin
-    FNode.FreeNotification(Self);
-    FNode.FNotifyList.Add(Self);
-  end;
 end;
 
 { TThreadSafeNodeNotifyEvent }
@@ -1249,7 +1205,7 @@ end;
 procedure TThreadNodeNotifyNewBlock.BCExecute;
 begin
   DebugStep := 'Locking';
-  if TNetData.NetData.ConnectionLock(Self,FNetConnection,500) then begin
+  if PascalNetData.ConnectionLock(Self,FNetConnection,500) then begin
     try
       DebugStep := 'Checking connected';
       if Not FNetconnection.Connected then exit;
@@ -1266,7 +1222,7 @@ begin
       end;
       DebugStep := 'Unlocking';
     finally
-      TNetData.NetData.ConnectionUnlock(FNetConnection);
+      PascalNetData.ConnectionUnlock(FNetConnection);
     end;
   end;
   DebugStep := 'Finalizing';
@@ -1296,12 +1252,12 @@ end;
 procedure TThreadNodeNotifyOperations.BCExecute;
 begin
   Sleep(Random(5000)); // Delay 0..5 seconds to allow receive data and don't send if not necessary
-  if TNetData.NetData.ConnectionLock(Self, FNetConnection, 500) then begin
+  if PascalNetData.ConnectionLock(Self, FNetConnection, 500) then begin
     try
       if Not FNetconnection.Connected then exit;
       FNetConnection.Send_AddOperations(Nil);
     finally
-      TNetData.NetData.ConnectionUnlock(FNetConnection);
+      PascalNetData.ConnectionUnlock(FNetConnection);
     end;
   end;
 end;

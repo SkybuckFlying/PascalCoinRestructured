@@ -3,7 +3,7 @@ unit UPCSafeBoxTransaction;
 interface
 
 uses
-  UOrderedAccountList, UPCSafeBox, URawBytes, UOrderedRawList, UAccount, UAccountPreviousBlockInfo, UAccountInfo, UAccountKey, UOperationBlock;
+  UOrderedAccountList, UPascalCoinSafeBox, URawBytes, UOrderedRawList, UAccount, UAccountPreviousBlockInfo, UAccountInfo, UAccountKey, UOperationBlock;
 
 type
   { TPCSafeBoxTransaction }

@@ -7,7 +7,7 @@ uses
 
 type
   { TStorage }
-  TStorage = Class(TComponent)
+  TStorage = Class
   private
     FOrphan: TOrphan;
 
@@ -39,7 +39,7 @@ type
     Procedure DeleteBlockChainBlocks(StartingDeleteBlock : Cardinal);
     Function SaveBank : Boolean;
     Function RestoreBank(max_block : Int64) : Boolean;
-    Constructor Create(AOwner : TComponent); Override;
+    Constructor Create;
     Property Orphan : TOrphan read FOrphan write SetOrphan;
     Property ReadOnly : Boolean read FReadOnly write SetReadOnly;
     Procedure CopyConfiguration(Const CopyFrom : TStorage); virtual;
@@ -57,7 +57,7 @@ type
 implementation
 
 uses
-  SysUtils, ULog, UPCBank, UPCSafeBox;
+  SysUtils, ULog, UPascalCoinBank, UPascalCoinSafeBox;
 
 { TStorage }
 
@@ -66,7 +66,7 @@ begin
   Orphan := CopyFrom.Orphan;
 end;
 
-constructor TStorage.Create(AOwner: TComponent);
+constructor TStorage.Create;
 begin
   inherited;
   FOrphan := '';
@@ -129,10 +129,10 @@ function TStorage.SaveBank: Boolean;
 begin
   Result := true;
   If FIsMovingBlockchain then Exit;
-  if Not TPCSafeBox.MustSafeBoxBeSaved(PascalCoinBank.BlocksCount) then exit; // No save
+  if Not TPCSafeBox.MustSafeBoxBeSaved(PascalCoinSafeBox.BlocksCount) then exit; // No save
   Try
     Result := DoSaveBank;
-    PascalCoinBank.SafeBox.CheckMemory;
+    PascalCoinSafeBox.CheckMemory;
   Except
     On E:Exception do begin
       TLog.NewLog(lterror,Classname,'Error saving Bank: '+E.Message);

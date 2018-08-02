@@ -77,7 +77,7 @@ Type
     Procedure DoSavePendingBufferOperations(OperationsHashTree : TOperationsHashTree); override;
     Procedure DoLoadPendingBufferOperations(OperationsHashTree : TOperationsHashTree); override;
   public
-    Constructor Create(AOwner : TComponent); Override;
+    Constructor Create;
     Destructor Destroy; Override;
     Class Function GetSafeboxCheckpointingFileName(Const BaseDataFolder : AnsiString; block : Cardinal) : AnsiString;
     Property DatabaseFolder : AnsiString read FDatabaseFolder write SetDatabaseFolder;
@@ -89,7 +89,7 @@ Type
 
 implementation
 
-Uses ULog, SysUtils, UConst, UPCBank;
+Uses ULog, SysUtils, UConst, UPascalCoinBank, UPascalCoinSafeBox;
 
 { TFileStorage }
 
@@ -206,7 +206,7 @@ begin
   end;
 end;
 
-constructor TFileStorage.Create(AOwner: TComponent);
+constructor TFileStorage.Create; // (AOwner: TComponent);
 begin
   inherited;
   FDatabaseFolder := '';
@@ -400,7 +400,7 @@ begin
     else db := Nil;
     try
       if Not assigned(db) then begin
-        db := TFileStorage.Create(Nil);
+        db := TFileStorage.Create; // (Nil);
         db.DatabaseFolder := Self.DatabaseFolder;
         db.Orphan := DestOrphan;
         db.FStreamFirstBlockNumber := Start_Block;
@@ -502,15 +502,15 @@ var fs: TFileStream;
     ms : TMemoryStream;
 begin
   Result := true;
-  bankfilename := GetSafeboxCheckpointingFileName(GetFolder(Orphan),PascalCoinBank.BlocksCount);
+  bankfilename := GetSafeboxCheckpointingFileName(GetFolder(Orphan),PascalCoinSafeBox.BlocksCount);
   if (bankfilename<>'') then begin
-    TLog.NewLog(ltInfo,ClassName,'Saving Safebox blocks:'+IntToStr(PascalCoinBank.BlocksCount)+' file:'+bankfilename);
+    TLog.NewLog(ltInfo,ClassName,'Saving Safebox blocks:'+IntToStr(PascalCoinSafeBox.BlocksCount)+' file:'+bankfilename);
     fs := TFileStream.Create(bankfilename,fmCreate);
     try
       fs.Size := 0;
       ms := TMemoryStream.Create;
       try
-        PascalCoinBank.SafeBox.SaveSafeBoxToAStream(ms,0,PascalCoinBank.SafeBox.BlocksCount-1);
+        PascalCoinSafeBox.SaveSafeBoxToAStream(ms,0,PascalCoinSafeBox.BlocksCount-1);
         ms.Position := 0;
         fs.Position := 0;
         fs.CopyFrom(ms,0);
@@ -521,8 +521,8 @@ begin
       fs.Free;
     end;
     // Save a copy each 10000 blocks (aprox 1 month) only when not an orphan
-    if (Orphan='') And ((PascalCoinBank.BlocksCount MOD (CT_BankToDiskEveryNBlocks*100))=0) then begin
-      aux_newfilename := GetFolder('') + PathDelim+'checkpoint_'+ inttostr(PascalCoinBank.BlocksCount)+'.safebox';
+    if (Orphan='') And ((PascalCoinSafeBox.BlocksCount MOD (CT_BankToDiskEveryNBlocks*100))=0) then begin
+      aux_newfilename := GetFolder('') + PathDelim+'checkpoint_'+ inttostr(PascalCoinSafeBox.BlocksCount)+'.safebox';
       try
         {$IFDEF FPC}
         DoCopyFile(bankfilename,aux_newfilename);
@@ -693,7 +693,7 @@ begin
   fs := TFileStream.Create(Filename,fmOpenRead);
   try
     fs.Position:=0;
-    Result := PascalCoinBank.SafeBox.LoadSafeBoxStreamHeader(fs,safeBoxHeader);
+    Result := PascalCoinSafeBox.LoadSafeBoxStreamHeader(fs,safeBoxHeader);
   finally
     fs.Free;
   end;

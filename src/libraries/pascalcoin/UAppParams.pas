@@ -60,7 +60,7 @@ Type
     function GetAsStream(Stream : TStream) : Integer;
   End;
 
-  TAppParams = Class(TComponent)
+  TAppParams = Class
   private
     FParamsStream : TFileStream;
     FParams : TList;
@@ -74,7 +74,7 @@ Type
     Procedure Save;
   protected
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor Destroy; override;
     Class function AppParams : TAppParams;
     Property FileName : AnsiString read FFileName write SetFileName;
@@ -331,7 +331,7 @@ end;
 class function TAppParams.AppParams: TAppParams;
 begin
   if Not Assigned(_appParams) then begin
-    _appParams := TAppParams.Create(Nil);
+    _appParams := TAppParams.Create;
   end;
   Result := _appParams;
 end;
@@ -347,7 +347,7 @@ begin
   Result := FParams.Count;
 end;
 
-constructor TAppParams.Create(AOwner: TComponent);
+constructor TAppParams.Create;
 begin
   inherited;
   FParams := TList.Create;

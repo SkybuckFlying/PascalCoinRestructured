@@ -54,8 +54,6 @@ Type
     Procedure InitGrid;
     Procedure OnNodeNewOperation(Sender : TObject);
     procedure OnGridDrawCell(Sender: TObject; ACol, ARow: Longint; Rect: TRect; State: TGridDrawState);
-    procedure SetNode(const Value: TNode);
-    function GetNode: TNode;
     procedure SetShowAllAccounts(const Value: Boolean);
     procedure SetAllowMultiSelect(const Value: Boolean);
   protected
@@ -66,7 +64,6 @@ Type
     Property DrawGrid : TDrawGrid read FDrawGrid write SetDrawGrid;
     Function LockAccountsList : TOrderedCardinalList;
     Procedure UnlockAccountsList;
-    Property Node : TNode read GetNode write SetNode;
     Function AccountNumber(GridRow : Integer) : Int64;
     Procedure SaveToStream(Stream : TStream);
     Procedure LoadFromStream(Stream : TStream);
@@ -95,8 +92,6 @@ Type
     procedure OnGridDrawCell(Sender: TObject; ACol, ARow: Longint; Rect: TRect; State: TGridDrawState);
     procedure SetDrawGrid(const Value: TDrawGrid);
     procedure SetAccountNumber(const Value: Int64);
-    procedure SetNode(const Value: TNode);
-    function GetNode: TNode;
     procedure SetPendingOperations(const Value: Boolean);
 
     procedure SetBlockEnd(const Value: Int64);
@@ -113,7 +108,6 @@ Type
     Property PendingOperations : Boolean read FPendingOperations write SetPendingOperations;
     Property AccountNumber : Int64 read FAccountNumber write SetAccountNumber;
     Property MustShowAlwaysAnAccount : Boolean read FMustShowAlwaysAnAccount write SetMustShowAlwaysAnAccount;
-    Property Node : TNode read GetNode write SetNode;
     Procedure UpdateAccountOperations; virtual;
     Procedure ShowModalDecoder(WalletKeys: TWalletKeys; AppParams : TAppParams);
     Property BlockStart : Int64 read FBlockStart write SetBlockStart;
@@ -165,7 +159,6 @@ Type
     Procedure OnNodeNewAccount(Sender : TObject);
     Procedure InitGrid;
     procedure OnGridDrawCell(Sender: TObject; ACol, ARow: Longint; Rect: TRect; State: TGridDrawState);
-    function GetNode: TNode;
     procedure SetBlockEnd(const Value: Int64);
     procedure SetBlockStart(const Value: Int64);
     procedure SetDrawGrid(const Value: TDrawGrid);
@@ -181,7 +174,6 @@ Type
     Constructor Create(AOwner : TComponent); override;
     Destructor Destroy; override;
     Property DrawGrid : TDrawGrid read FDrawGrid write SetDrawGrid;
-    Property Node : TNode read GetNode write SetNode;
     Procedure UpdateBlockChainGrid; virtual;
     Property BlockStart : Int64 read FBlockStart write SetBlockStart;
     Property BlockEnd : Int64 read FBlockEnd write SetBlockEnd;
@@ -200,7 +192,7 @@ implementation
 
 uses
   Graphics, SysUtils, UTime, UOpTransaction, UConst,
-  UFRMPayloadDecoder, ULog, UAccount, UAccountComp, UPtrInt, UPCOperation, UPCOperationsComp, UOperationBlock, UBigNum;
+  UFRMPayloadDecoder, ULog, UAccount, UAccountComp, UPtrInt, UPCOperation, UPCOperationsComp, UOperationBlock, UBigNum, UPascalCoinBank, UPascalCoinSafeBox;
 
 { TAccountsGrid }
 
@@ -211,7 +203,7 @@ function TAccountsGrid.AccountNumber(GridRow: Integer): Int64;
 begin
   if GridRow<1 then Result := -1
   else if FShowAllAccounts then begin
-    if Assigned(Node) then begin
+    if Assigned(PascalCoinNode) then begin
       Result := GridRow-1;
     end else Result := -1;
   end else if GridRow<=FAccountsList.Count then begin
@@ -256,11 +248,6 @@ begin
   inherited;
 end;
 
-function TAccountsGrid.GetNode: TNode;
-begin
-  Result := FNodeNotifyEvents.Node;
-end;
-
 procedure TAccountsGrid.InitGrid;
 Var i : Integer;
   acc : TAccount;
@@ -269,17 +256,17 @@ begin
   FAccountsCount := FAccountsList.Count;
   if Not assigned(DrawGrid) then exit;
   if FShowAllAccounts then begin
-    if Assigned(Node) then begin
-      if Node.Bank.AccountsCount<1 then DrawGrid.RowCount := 2
-      else DrawGrid.RowCount := Node.Bank.AccountsCount+1;
-      FAccountsBalance := Node.Bank.SafeBox.TotalBalance;
+    if Assigned(PascalCoinNode) then begin
+      if PascalCoinSafeBox.AccountsCount<1 then DrawGrid.RowCount := 2
+      else DrawGrid.RowCount := PascalCoinSafeBox.AccountsCount+1;
+      FAccountsBalance := PascalCoinSafeBox.TotalBalance;
     end else DrawGrid.RowCount := 2;
   end else begin
     if FAccountsList.Count<1 then DrawGrid.RowCount := 2
     else DrawGrid.RowCount := FAccountsList.Count+1;
-    if Assigned(Node) then begin
+    if Assigned(PascalCoinNode) then begin
       for i := 0 to FAccountsList.Count - 1 do begin
-        acc := Node.Bank.SafeBox.Account( FAccountsList.Get(i) );
+        acc := PascalCoinSafeBox.Account( FAccountsList.Get(i) );
         FAccountsBalance := FAccountsBalance + acc.balance;
       end;
     end;
@@ -331,10 +318,10 @@ Var oal : TOrderedCardinalList;
 begin
   Result := false;
   if Not Assigned(FDrawGrid) then exit;
-  if Not Assigned(Node) then exit;
+  if Not Assigned(PascalCoinNode) then exit;
   if FDrawGrid.RowCount<=1 then exit;
   if FShowAllAccounts then begin
-    If (FDrawGrid.RowCount>nAccount+1) And (nAccount>=0) And (nAccount<Node.Bank.AccountsCount) then begin
+    If (FDrawGrid.RowCount>nAccount+1) And (nAccount>=0) And (nAccount<PascalCoinSafeBox.AccountsCount) then begin
       FDrawGrid.Row := nAccount+1;
       Result := true;
     end else begin
@@ -434,7 +421,7 @@ Var C : TAccountColumn;
   account : TAccount;
   ndiff : Cardinal;
 begin
-  if Not Assigned(Node) then exit;
+  if Not Assigned(PascalCoinNode) then exit;
 
   if (ACol>=0) AND (ACol<length(FColumns)) then begin
     C := FColumns[ACol];
@@ -452,9 +439,9 @@ begin
   end else begin
     n_acc := AccountNumber(ARow);
     if (n_acc>=0) then begin
-      if (n_acc>=Node.Bank.AccountsCount) then account := CT_Account_NUL
-      else account := Node.Operations.SafeBoxTransaction.Account(n_acc);
-      ndiff := Node.Bank.BlocksCount - account.updated_block;
+      if (n_acc>=PascalCoinSafeBox.AccountsCount) then account := CT_Account_NUL
+      else account := PascalCoinNode.Operations.SafeBoxTransaction.Account(n_acc);
+      ndiff := PascalCoinSafeBox.BlocksCount - account.updated_block;
       if (gdSelected in State) then
         If (gdFocused in State) then DrawGrid.Canvas.Brush.Color := clGradientActiveCaption
         else DrawGrid.Canvas.Brush.Color := clGradientInactiveCaption
@@ -492,7 +479,7 @@ begin
           Canvas_TextRect(DrawGrid.Canvas,Rect,s,State,[tfRight,tfVerticalCenter,tfSingleLine]);
         End;
         act_updated_state : Begin
-          if TAccountComp.IsAccountBlockedByProtocol(account.account,Node.Bank.BlocksCount) then begin
+          if TAccountComp.IsAccountBlockedByProtocol(account.account,PascalCoinSafeBox.BlocksCount) then begin
             DrawGrid.Canvas.Brush.Color := clRed;
           end else if ndiff=0 then begin
             DrawGrid.Canvas.Brush.Color := RGB(255,128,0);
@@ -516,7 +503,7 @@ begin
             // Show price for sale
             s := TAccountComp.FormatMoney(account.accountInfo.price);
             if TAccountComp.IsAccountForSaleAcceptingTransactions(account.accountInfo) then begin
-              if TAccountComp.IsAccountLocked(account.accountInfo,Node.Bank.BlocksCount) then begin
+              if TAccountComp.IsAccountLocked(account.accountInfo,PascalCoinSafeBox.BlocksCount) then begin
                 DrawGrid.Canvas.Font.Color := clNavy;
               end else begin
                 DrawGrid.Canvas.Font.Color := clRed;
@@ -596,13 +583,6 @@ begin
   end;
 end;
 
-procedure TAccountsGrid.SetNode(const Value: TNode);
-begin
-  if GetNode=Value then exit;
-  FNodeNotifyEvents.Node := Value;
-  InitGrid;
-end;
-
 procedure TAccountsGrid.SetShowAllAccounts(const Value: Boolean);
 begin
   if FShowAllAccounts=Value then exit;
@@ -637,11 +617,6 @@ begin
   FOperationsResume.Free;
   FNodeNotifyEvents.Free;
   inherited;
-end;
-
-function TOperationsGrid.GetNode: TNode;
-begin
-  Result := FNodeNotifyEvents.Node;
 end;
 
 procedure TOperationsGrid.InitGrid;
@@ -785,7 +760,7 @@ begin
     end else begin
       l := TList.Create;
       Try
-        If Node.Operations.OperationsHashTree.GetOperationsAffectingAccount(AccountNumber,l)>0 then begin
+        If PascalCoinNode.Operations.OperationsHashTree.GetOperationsAffectingAccount(AccountNumber,l)>0 then begin
           if l.IndexOf(TObject(PtrInt(AccountNumber)))>=0 then UpdateAccountOperations;
         end;
       Finally
@@ -847,13 +822,6 @@ begin
   UpdateAccountOperations;
 end;
 
-procedure TOperationsGrid.SetNode(const Value: TNode);
-begin
-  if GetNode=Value then exit;
-  FNodeNotifyEvents.Node := Value;
-  UpdateAccountOperations; // New Build 1.0.3
-end;
-
 procedure TOperationsGrid.SetPendingOperations(const Value: Boolean);
 begin
   FPendingOperations := Value;
@@ -901,16 +869,16 @@ Var list : TList;
 begin
   FOperationsResume.Clear;
   Try
-    if Not Assigned(Node) then exit;
+    if Not Assigned(PascalCoinNode) then exit;
     if (MustShowAlwaysAnAccount) And (AccountNumber<0) then exit;
 
     if FPendingOperations then begin
-      for i := Node.Operations.Count - 1 downto 0 do begin
-        Op := Node.Operations.OperationsHashTree.GetOperation(i);
+      for i := PascalCoinNode.Operations.Count - 1 downto 0 do begin
+        Op := PascalCoinNode.Operations.OperationsHashTree.GetOperation(i);
         If TPCOperation.OperationToOperationResume(0,Op,True,Op.SignerAccount,OPR) then begin
           OPR.NOpInsideBlock := i;
-          OPR.Block := Node.Bank.BlocksCount;
-          OPR.Balance := Node.Operations.SafeBoxTransaction.Account(Op.SignerAccount).balance;
+          OPR.Block := PascalCoinSafeBox.BlocksCount;
+          OPR.Balance := PascalCoinNode.Operations.SafeBoxTransaction.Account(Op.SignerAccount).balance;
           FOperationsResume.Add(OPR);
         end;
       end;
@@ -919,7 +887,7 @@ begin
         opc := TPCOperationsComp.Create;
         try
           If FBlockEnd<0 then begin
-            If Node.Bank.BlocksCount>0 then bend := Node.Bank.BlocksCount-1
+            If PascalCoinSafeBox.BlocksCount>0 then bend := PascalCoinSafeBox.BlocksCount-1
             else bend := 0;
           end else bend := FBlockEnd;
           if FBlockStart<0 then begin
@@ -927,10 +895,10 @@ begin
             else bstart := 0;
           end else bstart:= FBlockStart;
           If bstart<0 then bstart := 0;
-          if bend>=Node.Bank.BlocksCount then bend:=Node.Bank.BlocksCount;
+          if bend>=PascalCoinSafeBox.BlocksCount then bend:=PascalCoinSafeBox.BlocksCount;
           while (bstart<=bend) do begin
             opr := CT_TOperationResume_NUL;
-            if (Node.Bank.Storage.LoadBlockChainBlock(opc,bend)) then begin
+            if (PascalCoinBank.Storage.LoadBlockChainBlock(opc,bend)) then begin
               // Reward operation
               OPR := CT_TOperationResume_NUL;
               OPR.valid := true;
@@ -961,20 +929,20 @@ begin
       end else begin
         list := TList.Create;
         Try
-          Node.Operations.OperationsHashTree.GetOperationsAffectingAccount(AccountNumber,list);
+          PascalCoinNode.Operations.OperationsHashTree.GetOperationsAffectingAccount(AccountNumber,list);
           for i := list.Count - 1 downto 0 do begin
-            Op := Node.Operations.OperationsHashTree.GetOperation(PtrInt(list[i]));
+            Op := PascalCoinNode.Operations.OperationsHashTree.GetOperation(PtrInt(list[i]));
             If TPCOperation.OperationToOperationResume(0,Op,False,AccountNumber,OPR) then begin
               OPR.NOpInsideBlock := i;
-              OPR.Block := Node.Operations.OperationBlock.block;
-              OPR.Balance := Node.Operations.SafeBoxTransaction.Account(AccountNumber).balance;
+              OPR.Block := PascalCoinNode.Operations.OperationBlock.block;
+              OPR.Balance := PascalCoinNode.Operations.SafeBoxTransaction.Account(AccountNumber).balance;
               FOperationsResume.Add(OPR);
             end;
           end;
         Finally
           list.Free;
         End;
-        Node.GetStoredOperationsFromAccount(FOperationsResume,AccountNumber,100,0,5000);
+        PascalCoinNode.GetStoredOperationsFromAccount(FOperationsResume,AccountNumber,100,0,5000);
       end;
     end;
   Finally
@@ -1002,16 +970,9 @@ end;
 destructor TBlockChainGrid.Destroy;
 begin
   FNodeNotifyEvents.OnBlocksChanged := Nil;
-  FNodeNotifyEvents.Node := Nil;
   FreeAndNil(FNodeNotifyEvents);
   inherited;
 end;
-
-function TBlockChainGrid.GetNode: TNode;
-begin
-  Result := FNodeNotifyEvents.Node;
-end;
-
 
 procedure TBlockChainGrid.InitGrid;
 begin
@@ -1266,7 +1227,6 @@ end;
 
 procedure TBlockChainGrid.SetNode(const Value: TNode);
 begin
-  FNodeNotifyEvents.Node := Value;
   UpdateBlockChainGrid;
 end;
 
@@ -1282,23 +1242,23 @@ begin
   if (FBlockStart>FBlockEnd) And (FBlockStart>=0) then FBlockEnd := -1;
   if (FBlockEnd>=0) And (FBlockEnd<FBlockStart) then FBlockStart:=-1;
 
-  if Not Assigned(FNodeNotifyEvents.Node) then exit;
+  if Not Assigned(PascalCoinSafeBox) then exit;
 
-  if FBlockStart>(FNodeNotifyEvents.Node.Bank.BlocksCount-1) then FBlockStart := -1;
+  if FBlockStart>(PascalCoinSafeBox.BlocksCount-1) then FBlockStart := -1;
 
   try
-    if Node.Bank.BlocksCount<=0 then begin
+    if PascalCoinSafeBox.BlocksCount<=0 then begin
       SetLength(FBlockChainDataArray,0);
       exit;
     end;
-    if (FBlockEnd>=0) And (FBlockEnd<Node.Bank.BlocksCount) then begin
+    if (FBlockEnd>=0) And (FBlockEnd<PascalCoinSafeBox.BlocksCount) then begin
       nend := FBlockEnd
     end else begin
-      if (FBlockStart>=0) And (FBlockStart+MaxBlocks<=Node.Bank.BlocksCount) then nend := FBlockStart + MaxBlocks - 1
-      else nend := Node.Bank.BlocksCount-1;
+      if (FBlockStart>=0) And (FBlockStart+MaxBlocks<=PascalCoinSafeBox.BlocksCount) then nend := FBlockStart + MaxBlocks - 1
+      else nend := PascalCoinSafeBox.BlocksCount-1;
     end;
 
-    if (FBlockStart>=0) And (FBlockStart<Node.Bank.BlocksCount) then nstart := FBlockStart
+    if (FBlockStart>=0) And (FBlockStart<PascalCoinSafeBox.BlocksCount) then nstart := FBlockStart
     else begin
       if nend>MaxBlocks then nstart := nend - MaxBlocks + 1
       else nstart := 0;
@@ -1309,7 +1269,7 @@ begin
       while (nstart<=nend) do begin
         i := length(FBlockChainDataArray) - (nend-nstart+1);
         bcd := CT_TBlockChainData_NUL;
-        opb := Node.Bank.SafeBox.Block(nend).blockchainInfo;
+        opb := PascalCoinSafeBox.Block(nend).blockchainInfo;
         bcd.Block:=opb.block;
         bcd.Timestamp := opb.timestamp;
         bcd.BlockProtocolVersion := opb.protocol_version;
@@ -1317,7 +1277,7 @@ begin
         bcd.Reward := opb.reward;
         bcd.Fee := opb.fee;
         bcd.Target := opb.compact_target;
-        bcd.HashRateKhs := Node.Bank.SafeBox.CalcBlockHashRateInKhs(bcd.Block,HashRateAverageBlocksCount);
+        bcd.HashRateKhs := PascalCoinSafeBox.CalcBlockHashRateInKhs(bcd.Block,HashRateAverageBlocksCount);
         bn := TBigNum.TargetToHashRate(opb.compact_target);
         Try
           bcd.HashRateTargetKhs := bn.Divide(1024).Divide(CT_NewLineSecondsAvg).Value;
@@ -1327,18 +1287,18 @@ begin
         bcd.MinerPayload := opb.block_payload;
         bcd.PoW := opb.proof_of_work;
         bcd.SafeBoxHash := opb.initial_safe_box_hash;
-        bcd.AccumulatedWork := Node.Bank.SafeBox.Block(bcd.Block).AccumulatedWork;
-        if (Node.Bank.LoadOperations(opc,nend)) then begin
+        bcd.AccumulatedWork := PascalCoinSafeBox.Block(bcd.Block).AccumulatedWork;
+        if (PascalCoinBank.LoadOperations(opc,nend)) then begin
           bcd.OperationsCount := opc.Count;
           bcd.Volume := opc.OperationsHashTree.TotalAmount + opc.OperationsHashTree.TotalFee;
         end;
-        bcd.TimeAverage200:=Node.Bank.GetTargetSecondsAverage(bcd.Block,200);
-        bcd.TimeAverage150:=Node.Bank.GetTargetSecondsAverage(bcd.Block,150);
-        bcd.TimeAverage100:=Node.Bank.GetTargetSecondsAverage(bcd.Block,100);
-        bcd.TimeAverage75:=Node.Bank.GetTargetSecondsAverage(bcd.Block,75);
-        bcd.TimeAverage50:=Node.Bank.GetTargetSecondsAverage(bcd.Block,50);
-        bcd.TimeAverage25:=Node.Bank.GetTargetSecondsAverage(bcd.Block,25);
-        bcd.TimeAverage10:=Node.Bank.GetTargetSecondsAverage(bcd.Block,10);
+        bcd.TimeAverage200:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,200);
+        bcd.TimeAverage150:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,150);
+        bcd.TimeAverage100:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,100);
+        bcd.TimeAverage75:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,75);
+        bcd.TimeAverage50:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,50);
+        bcd.TimeAverage25:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,25);
+        bcd.TimeAverage10:=PascalCoinBank.GetTargetSecondsAverage(bcd.Block,10);
         FBlockChainDataArray[i] := bcd;
         if (nend>0) then dec(nend) else break;
       end;

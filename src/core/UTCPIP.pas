@@ -45,7 +45,7 @@ type
 
   { TNetTcpIpClient }
 
-  TNetTcpIpClient = Class(TComponent)
+  TNetTcpIpClient = Class // (TComponent)
   private
     FTcpBlockSocket : TTCPBlockSocket;
     {$IFDEF Synapse}
@@ -77,7 +77,7 @@ type
     Function SendStream(Stream : TStream) : Int64;
     Procedure DoWaitForData(WaitMilliseconds : Integer; var HasData : Boolean); virtual;
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create; // (AOwner : TComponent); override;
     Destructor Destroy; override;
     Function ClientRemoteAddr : AnsiString;
     Property RemoteHost : AnsiString read GetRemoteHost Write SetRemoteHost;
@@ -119,7 +119,7 @@ type
     Function DoWaitForDataInherited(WaitMilliseconds : Integer) : Boolean;
     Procedure DoWaitForData(WaitMilliseconds : Integer; var HasData : Boolean); override;
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create; // (AOwner : TComponent); override;
     Destructor Destroy; override;
     Procedure WriteBufferToSend(SendData : TStream);
     Function ReadBufferLock : TMemoryStream;
@@ -266,7 +266,7 @@ begin
   {$ENDIF}
 end;
 
-constructor TNetTcpIpClient.Create(AOwner : TComponent);
+constructor TNetTcpIpClient.Create; // (AOwner : TComponent);
 begin
   inherited;
   FOnConnect := Nil;
@@ -626,7 +626,7 @@ end;
 
 { TBufferedNetTcpIpClient }
 
-constructor TBufferedNetTcpIpClient.Create(AOwner: TComponent);
+constructor TBufferedNetTcpIpClient.Create; // (AOwner: TComponent);
 begin
   inherited;
   FLastReadTC := TPlatform.GetTickCount;
@@ -767,7 +767,7 @@ begin
       FTcpIpServer.ServerSocketThread.ThreadCacheSize := MaxConnections;
   {$ENDIF}
 
-  n := FNetTcpIpClientClass.Create(Nil);
+  n := FNetTcpIpClientClass.Create; // (Nil);
   Try
     {$IFDEF Synapse}
     n.FLock.Acquire;

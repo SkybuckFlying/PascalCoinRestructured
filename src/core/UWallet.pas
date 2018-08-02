@@ -20,7 +20,7 @@ unit UWallet;
 interface
 
 uses
-  Classes, USettings, UBlockChain, UAccounts, UCrypto, UAccountKey, UOrderedAccountKeysList, UPCSafeBox, UECPrivateKey, UECDSA_Public, UNotifyEventToMany;
+  Classes, USettings, UBlockChain, UAccounts, UCrypto, UAccountKey, UOrderedAccountKeysList, UPascalCoinSafeBox, UECPrivateKey, UECDSA_Public, UNotifyEventToMany;
 
 Type
   TWalletKey = Record
@@ -32,7 +32,7 @@ Type
     function HasPrivateKey : boolean;
   End;
 
-  TWalletKeys = Class(TComponent)
+  TWalletKeys = Class
   private
     FSearchableKeys : TList;
     FFileName: AnsiString;
@@ -50,7 +50,7 @@ Type
     Function Find(Const AccountKey: TAccountKey; var Index: Integer): Boolean;
   public
     Property Key[index : Integer] : TWalletKey read GetKey; default;
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor destroy; override;
     Procedure LoadFromStream(Stream : TStream);
     Procedure SaveToStream(Stream : TStream);
@@ -75,7 +75,7 @@ Type
     procedure SetSafeBox(const Value: TPCSafeBox);
     function GetSafeBox: TPCSafeBox;
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create;
     Destructor destroy; override;
     Function AddPrivateKey(Const Name : AnsiString; ECPrivateKey : TECPrivateKey) : Integer; override;
     Function AddPublicKey(Const Name : AnsiString; ECDSA_Public : TECDSA_Public) : Integer; override;
@@ -217,7 +217,7 @@ begin
   Result := FSearchableKeys.Count;
 end;
 
-constructor TWalletKeys.Create(AOwner : TComponent);
+constructor TWalletKeys.Create;
 begin
   inherited;
   FIsValidPassword := false;
@@ -466,7 +466,7 @@ begin
   end;
 end;
 
-constructor TWalletKeysExt.Create(AOwner: TComponent);
+constructor TWalletKeysExt.Create;
 begin
   inherited;
   FOrderedAccountKeysList := Nil;
@@ -554,7 +554,7 @@ class procedure TWallet.Load;
 begin
   try
     if not Assigned(FKeys) then
-      FKeys := TWalletKeysExt.Create(nil);
+      FKeys := TWalletKeysExt.Create;
     FKeys.WalletFileName := TFolderHelper.GetPascalCoinDataFolder+PathDelim+'WalletKeys.dat';
   except
     on E:Exception do begin
@@ -655,7 +655,7 @@ begin
   if NOT FileExists(AFileName) then
     raise Exception.Create('File not found: ' + AFilename);
 
-  wki := TWalletKeys.Create(nil);
+  wki := TWalletKeys.Create;
   try
     wki.WalletFileName := AFileName;
     if wki.Count<=0 then

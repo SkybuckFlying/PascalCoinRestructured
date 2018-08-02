@@ -27,7 +27,7 @@ uses
 {$ENDIF}
   Messages, SysUtils, Variants, Classes, Graphics, Controls, Forms,
   Dialogs, UAccounts, Grids, StdCtrls, Buttons, ExtCtrls, UWallet, UNode,
-  UGridUtils, UConst, UThread, UPCSafeBox, UAccountKey, UCardinalsArray, UOrderedAccountList;
+  UGridUtils, UConst, UThread, UPascalCoinSafeBox, UAccountKey, UCardinalsArray, UOrderedAccountList;
 
 const
   CT_AS_MyAccounts = $0001;
@@ -113,7 +113,6 @@ type
     procedure SetAllowSelect(AValue: Boolean);
     procedure SetDefaultAccount(AValue: Int64);
     procedure SetFilters(AValue: Integer);
-    procedure SetNode(const Value: TNode);
     procedure SetWalletKeys(const Value: TWalletKeys);
     Procedure SearchFiltered;
     Procedure UpdateControls;
@@ -124,7 +123,6 @@ type
   public
     { Public declarations }
     Property WalletKeys : TWalletKeys read FWalletKeys write SetWalletKeys;
-    Property Node : TNode read FNode write SetNode;
     Property Filters : Integer read FFilters write SetFilters;
     Property DefaultAccount : Int64 read FDefaultAccount write SetDefaultAccount;
     Function GetSelected : Int64;
@@ -434,13 +432,6 @@ begin
   FAccounts.Free;
 end;
 
-procedure TFRMAccountSelect.SetNode(const Value: TNode);
-begin
-  FNode := Value;
-  FSafeBox := FNode.Bank.SafeBox;
-  UpdateControls;
-end;
-
 procedure TFRMAccountSelect.SetWalletKeys(const Value: TWalletKeys);
 begin
   FWalletKeys := Value;
@@ -504,7 +495,7 @@ begin
      (Not searchValues.onlyForPrivateSaleToMe) And (Not searchValues.onlyForPublicSale) And (Not searchValues.onlyForSale) And
      (searchValues.searchName='') then begin
     FAccountsGrid.ShowAllAccounts:=True;
-    lblAccountsCount.Caption := IntToStr(FAccountsGrid.Node.Bank.SafeBox.AccountsCount);
+    lblAccountsCount.Caption := IntToStr(PascalCoinSafeBox.AccountsCount);
     lblAccountsBalance.Caption := TAccountComp.FormatMoney(FAccountsGrid.AccountsBalance);
   end else begin
     FAccountsGrid.ShowAllAccounts:=False;

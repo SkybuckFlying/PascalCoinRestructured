@@ -421,10 +421,6 @@ object FRMWallet: TFRMWallet
     OnChange = PageControlChange
     object tsMyAccounts: TTabSheet
       Caption = 'Account Explorer'
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       object Splitter1: TSplitter
         Left = 400
         Top = 66
@@ -1103,10 +1099,6 @@ object FRMWallet: TFRMWallet
     object tsNodeStats: TTabSheet
       Caption = 'Node Stats'
       ImageIndex = 3
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         857
         438)
@@ -1176,10 +1168,6 @@ object FRMWallet: TFRMWallet
     object tsMessages: TTabSheet
       Caption = 'Messages'
       ImageIndex = 6
-      ExplicitLeft = 0
-      ExplicitTop = 0
-      ExplicitWidth = 0
-      ExplicitHeight = 0
       DesignSize = (
         857
         438)

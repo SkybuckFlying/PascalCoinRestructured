@@ -179,7 +179,7 @@ implementation
 
 uses
   UECIES, UConst, UOpTransaction, UFRMNewPrivateKeyType, UAES, UFRMWalletKeys, UOperationsHashTree, UPCOperation, UECDSA_Public, UCardinalsArray, UAccountComp,
-  UPtrInt, UPCSafeBox;
+  UPtrInt, UPascalCoinSafeBox;
 
 {$IFnDEF FPC}
   {$R *.dfm}
@@ -234,7 +234,7 @@ begin
   If Not UpdateOperationOptions(errors) then raise Exception.Create(errors);
   ops := TOperationsHashTree.Create;
   Try
-    _V2 := FNode.Bank.SafeBox.CurrentProtocol >= CT_PROTOCOL_2;
+    _V2 := PascalCoinSafeBox.CurrentProtocol >= CT_PROTOCOL_2;
     _totalamount := 0;
     _totalfee := 0;
     _totalSignerFee := 0;
@@ -524,7 +524,6 @@ begin
   FSenderAccounts := TOrderedCardinalList.Create;
   FSenderAccounts.OnListChanged := OnSenderAccountsChanged;
   FDisabled := true;
-  FNode := TNode.Node;
   ebSenderAccount.OnKeyDown:=ebAccountKeyDown;
   ebSenderAccount.Tag:=CT_AS_MyAccounts;
   ebSignerAccount.Text:='';
@@ -627,7 +626,6 @@ Var F : TFRMAccountSelect;
 begin
   F := TFRMAccountSelect.Create(Self);
   try
-    F.Node := FNode;
     F.WalletKeys := FWalletKeys;
     F.Filters:=editBox.Tag;
     If TAccountComp.AccountTxtNumberToAccountNumber(editBox.Text,c) then F.DefaultAccount := c;
@@ -644,7 +642,7 @@ procedure TFRMOperation.memoPayloadClick(Sender: TObject);
 Var errors : AnsiString;
 begin
   if SenderAccounts.Count>0 then begin
-    UpdatePayload(TNode.Node.Bank.SafeBox.Account(SenderAccounts.Get(0)),errors);
+    UpdatePayload(PascalCoinSafeBox.Account(SenderAccounts.Get(0)),errors);
   end;
 end;
 
@@ -754,7 +752,7 @@ begin
       ebSenderAccount.Text := TAccountComp.AccountNumberToAccountTxtNumber(SenderAccounts.Get(0));
       memoAccounts.Visible := false;
       ebSenderAccount.Visible := true;
-      balance := TNode.Node.Operations.SafeBoxTransaction.Account(SenderAccounts.Get(0)).balance;
+      balance := PascalCoinNode.Operations.SafeBoxTransaction.Account(SenderAccounts.Get(0)).balance;
     end else begin
       // Multiple sender accounts
       lblAccountCaption.Caption := 'Accounts';
@@ -762,7 +760,7 @@ begin
       ebSenderAccount.Visible := false;
       accountstext := '';
       for i := 0 to SenderAccounts.Count - 1 do begin
-         acc := TNode.Node.Operations.SafeBoxTransaction.Account(SenderAccounts.Get(i));
+         acc := PascalCoinNode.Operations.SafeBoxTransaction.Account(SenderAccounts.Get(i));
          balance := balance + acc.balance;
          if (accountstext<>'') then accountstext:=accountstext+'; ';
          accountstext := accountstext+TAccountComp.AccountNumberToAccountTxtNumber(acc.account)+' ('+TAccountComp.FormatMoney(acc.balance)+')';
@@ -811,7 +809,7 @@ begin
       errors := 'Invalid account to buy '+ebAccountToBuy.Text;
       exit;
     end;
-    If (c<0) Or (c>=FNode.Bank.AccountsCount) Or (c=SenderAccount.account) then begin
+    If (c<0) Or (c>=PascalCoinSafeBox.AccountsCount) Or (c=SenderAccount.account) then begin
       errors := 'Invalid account number';
       exit;
     end;
@@ -839,7 +837,7 @@ begin
     i := PtrInt(cbBuyNewKey.Items.Objects[cbBuyNewKey.ItemIndex]);
     if (i<0) Or (i>=WalletKeys.Count) then raise Exception.Create('Invalid selected key');
     NewPublicKey := WalletKeys.Key[i].AccountKey;
-    If (FNode.Bank.SafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
+    If (PascalCoinSafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
       errors := 'This operation needs PROTOCOL 2 active';
       exit;
     end;
@@ -860,7 +858,7 @@ begin
   lblChangeInfoErrors.Caption:='';
   if not (PageControlOpType.ActivePage=tsChangeInfo) then exit;
   try
-    if (TAccountComp.IsAccountLocked(TargetAccount.accountInfo,FNode.Bank.BlocksCount)) then begin
+    if (TAccountComp.IsAccountLocked(TargetAccount.accountInfo,PascalCoinSafeBox.BlocksCount)) then begin
       errors := 'Account '+TAccountComp.AccountNumberToAccountTxtNumber(TargetAccount.account)+' is locked until block '+IntToStr(TargetAccount.accountInfo.locked_until_block);
       exit;
     end;
@@ -873,12 +871,12 @@ begin
     end else begin
        auxC := TargetAccount.account;
     end;
-    if (auxC<0) Or (auxC >= FNode.Bank.AccountsCount) then begin
+    if (auxC<0) Or (auxC >= PascalCoinSafeBox.AccountsCount) then begin
       errors := 'Signer account does not exists '+TAccountComp.AccountNumberToAccountTxtNumber(auxC);
       exit;
     end;
     SignerAccount := FNode.Operations.SafeBoxTransaction.Account(auxC);
-    if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,FNode.Bank.BlocksCount)) then begin
+    if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,PascalCoinSafeBox.BlocksCount)) then begin
       errors := 'Signer account '+TAccountComp.AccountNumberToAccountTxtNumber(SignerAccount.account)+' is locked until block '+IntToStr(SignerAccount.accountInfo.locked_until_block);
       exit;
     end;
@@ -886,7 +884,7 @@ begin
       errors := 'Signer account '+TAccountComp.AccountNumberToAccountTxtNumber(SignerAccount.account)+' is not ower of account '+TAccountComp.AccountNumberToAccountTxtNumber(TargetAccount.account);
       exit;
     end;
-    If (FNode.Bank.SafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
+    If (PascalCoinSafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
       errors := 'This operation needs PROTOCOL 2 active';
       exit;
     end;
@@ -900,7 +898,7 @@ begin
             errors := '"'+newName+'" is not a valid name: '+errors;
             Exit;
           end;
-          i := (FNode.Bank.SafeBox.FindAccountByName(newName));
+          i := (PascalCoinSafeBox.FindAccountByName(newName));
           if (i>=0) then begin
             errors := 'Name "'+newName+'" is used by account '+TAccountComp.AccountNumberToAccountTxtNumber(i);
             Exit;
@@ -966,18 +964,18 @@ begin
       lblChangeKeyErrors.Caption := errors;
       exit;
     end;
-    If FNode.Bank.SafeBox.CurrentProtocol>=1 then begin
+    If PascalCoinSafeBox.CurrentProtocol>=1 then begin
       // Signer:
       If Not TAccountComp.AccountTxtNumberToAccountNumber(ebSignerAccount.Text,auxC) then begin
         errors := 'Invalid signer account';
         exit;
       end;
-      if (auxC<0) Or (auxC >= FNode.Bank.AccountsCount) then begin
+      if (auxC<0) Or (auxC >= PascalCoinSafeBox.AccountsCount) then begin
         errors := 'Signer account does not exists '+TAccountComp.AccountNumberToAccountTxtNumber(auxC);
         exit;
       end;
       SignerAccount := FNode.Operations.SafeBoxTransaction.Account(auxC);
-      if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,FNode.Bank.BlocksCount)) then begin
+      if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,PascalCoinSafeBox.BlocksCount)) then begin
         errors := 'Signer account '+TAccountComp.AccountNumberToAccountTxtNumber(SignerAccount.account)+' is locked until block '+IntToStr(SignerAccount.accountInfo.locked_until_block);
         exit;
       end;
@@ -1009,7 +1007,7 @@ begin
       errors := 'Account '+TAccountComp.AccountNumberToAccountTxtNumber(TargetAccount.account)+' is not for sale';
       exit;
     end;
-    if (TAccountComp.IsAccountLocked(TargetAccount.accountInfo,FNode.Bank.BlocksCount)) then begin
+    if (TAccountComp.IsAccountLocked(TargetAccount.accountInfo,PascalCoinSafeBox.BlocksCount)) then begin
       errors := 'Account '+TAccountComp.AccountNumberToAccountTxtNumber(TargetAccount.account)+' is locked until block '+IntToStr(TargetAccount.accountInfo.locked_until_block);
       exit;
     end;
@@ -1018,12 +1016,12 @@ begin
       errors := 'Invalid signer account';
       exit;
     end;
-    if (auxC<0) Or (auxC >= FNode.Bank.AccountsCount) then begin
+    if (auxC<0) Or (auxC >= PascalCoinSafeBox.AccountsCount) then begin
       errors := 'Signer account does not exists '+TAccountComp.AccountNumberToAccountTxtNumber(auxC);
       exit;
     end;
     SignerAccount := FNode.Operations.SafeBoxTransaction.Account(auxC);
-    if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,FNode.Bank.BlocksCount)) then begin
+    if (TAccountComp.IsAccountLocked(SignerAccount.accountInfo,PascalCoinSafeBox.BlocksCount)) then begin
       errors := 'Signer account '+TAccountComp.AccountNumberToAccountTxtNumber(SignerAccount.account)+' is locked until block '+IntToStr(SignerAccount.accountInfo.locked_until_block);
       exit;
     end;
@@ -1031,7 +1029,7 @@ begin
       errors := 'Signer account '+TAccountComp.AccountNumberToAccountTxtNumber(SignerAccount.account)+' is not ower of delisted account '+TAccountComp.AccountNumberToAccountTxtNumber(TargetAccount.account);
       exit;
     end;
-    If (FNode.Bank.SafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
+    If (PascalCoinSafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
       errors := 'This operation needs PROTOCOL 2 active';
       exit;
     end;
@@ -1078,7 +1076,7 @@ begin
       exit;
     end else begin
       for iAcc := 0 to SenderAccounts.Count - 1 do begin
-        sender_account := TNode.Node.Bank.SafeBox.Account(SenderAccounts.Get(iAcc));
+        sender_account := PascalCoinSafeBox.Account(SenderAccounts.Get(iAcc));
         iWallet := WalletKeys.IndexOfAccountKey(sender_account.accountInfo.accountKey);
         if (iWallet<0) then begin
           errors := 'Private key of account '+TAccountComp.AccountNumberToAccountTxtNumber(sender_account.account)+' not found in wallet';
@@ -1144,7 +1142,7 @@ begin
     rbEncryptedWithOldEC.Caption := 'Encrypted with buyer public key';
     rbEncryptedWithEC.Caption := 'Encrypted with target public key';
   end;
-  ebSignerAccount.Enabled:= ((PageControlOpType.ActivePage=tsChangePrivateKey) And (FNode.Bank.SafeBox.CurrentProtocol>=CT_PROTOCOL_2))
+  ebSignerAccount.Enabled:= ((PageControlOpType.ActivePage=tsChangePrivateKey) And (PascalCoinSafeBox.CurrentProtocol>=CT_PROTOCOL_2))
     Or ((PageControlOpType.ActivePage=tsChangeInfo) And (SenderAccounts.Count=1))
     Or (PageControlOpType.ActivePage=tsListForSale)
     Or (PageControlOpType.ActivePage=tsDelist);
@@ -1190,7 +1188,7 @@ begin
         errors := 'Invalid signer account';
         exit;
       end;
-      if (auxC<0) Or (auxC >= FNode.Bank.AccountsCount) then begin
+      if (auxC<0) Or (auxC >= PascalCoinSafeBox.AccountsCount) then begin
         errors := 'Signer account does not exists '+TAccountComp.AccountNumberToAccountTxtNumber(auxC);
         exit;
       end;
@@ -1200,7 +1198,7 @@ begin
         errors := 'Invalid seller account';
         exit;
       end;
-      if (auxC<0) Or (auxC >= FNode.Bank.AccountsCount) then begin
+      if (auxC<0) Or (auxC >= PascalCoinSafeBox.AccountsCount) then begin
         errors := 'Seller account does not exists '+TAccountComp.AccountNumberToAccountTxtNumber(auxC);
         exit;
       end;
@@ -1232,7 +1230,7 @@ begin
           exit;
         end;
       end;
-      If (FNode.Bank.SafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
+      If (PascalCoinSafeBox.CurrentProtocol=CT_PROTOCOL_1) then begin
         errors := 'This operation needs PROTOCOL 2 active';
         exit;
       end;
@@ -1265,12 +1263,12 @@ begin
     lblTransactionErrors.Caption := errors;
     exit;
   end;
-  if (c<0) Or (c>=TNode.Node.Bank.AccountsCount) then begin
+  if (c<0) Or (c>=PascalCoinSafeBox.AccountsCount) then begin
     errors := 'Invalid dest. account ('+TAccountComp.AccountNumberToAccountTxtNumber(c)+')';
     lblTransactionErrors.Caption := errors;
     exit;
   end;
-  DestAccount := TNode.Node.Operations.SafeBoxTransaction.Account(c);
+  DestAccount := PascalCoinNode.Operations.SafeBoxTransaction.Account(c);
   if SenderAccounts.Count=1 then begin
     if not TAccountComp.TxtToMoney(ebAmount.Text,amount) then begin
       errors := 'Invalid amount ('+ebAmount.Text+')';
@@ -1349,7 +1347,7 @@ begin
           errors := 'ERROR DEV 20170512-1';
           exit;
         end;
-        if (dest_account_number<0) or (dest_account_number>=FNode.Bank.AccountsCount) then begin
+        if (dest_account_number<0) or (dest_account_number>=PascalCoinSafeBox.AccountsCount) then begin
           errors := 'Invalid payload encrypted account number: '+TAccountComp.AccountNumberToAccountTxtNumber(dest_account_number);
           exit;
         end;

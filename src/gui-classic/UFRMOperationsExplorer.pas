@@ -104,7 +104,6 @@ type
     procedure MiRPCCallsClick(Sender: TObject);
   private
     FOperationsHashTree : TOperationsHashTree;
-    FSourceNode: TNode;
     FSourceWalletKeys: TWalletKeys;
     procedure OnOperationsHashTreeChanged(Sender : TObject);
     procedure SetSourceNode(AValue: TNode);
@@ -116,7 +115,6 @@ type
     Function GetSelectedMultiOperation : TOpMultiOperation;
     procedure DoCheckWalletKeysPwd;
   public
-    Property SourceNode : TNode read FSourceNode write SetSourceNode;
     Property SourceWalletKeys : TWalletKeys read FSourceWalletKeys write SetSourceWalletKeys;
   end;
 
@@ -132,8 +130,8 @@ Uses
 {$IFDEF TESTNET}
    UFRMRandomOperations,
 {$ENDIF}
-   UFRMRPCCalls, UMultiOpSender, UMultiOpReceiver, UAccountComp, UMultiOpChangeInfo, UAccountKey, UECDSA_Public, UPCSafeBox,
-   UOpChangeAccountInfoType, UPCOperationsComp, UOperationResume, UPtrInt;
+   UFRMRPCCalls, UMultiOpSender, UMultiOpReceiver, UAccountComp, UMultiOpChangeInfo, UAccountKey, UECDSA_Public, UPascalCoinSafeBox,
+   UOpChangeAccountInfoType, UPCOperationsComp, UOperationResume, UPtrInt, UPascalCoinBank;
 
 
 { TFRMOperationsExplorer }
@@ -142,7 +140,6 @@ procedure TFRMOperationsExplorer.FormCreate(Sender: TObject);
 begin
    FOperationsHashTree := TOperationsHashTree.Create;
    FOperationsHashTree.OnChanged:=OnOperationsHashTreeChanged;
-   FSourceNode := Nil;
    FSourceWalletKeys:= Nil;
    {$IFDEF TESTNET}
    bbRandom.Visible:=True;
@@ -189,10 +186,10 @@ LBL_start_sender:
 
     n_operation := 0;
     amount := 0;
-    If Assigned(FSourceNode) then begin
-      If (nSender<FSourceNode.Bank.AccountsCount) then begin
-        n_operation := FSourceNode.Bank.SafeBox.Account(nSender).n_operation+1;
-        amount := FSourceNode.Bank.SafeBox.Account(nSender).balance;
+    If Assigned(PascalCoinNode) then begin
+      If (nSender<PascalCoinSafeBox.AccountsCount) then begin
+        n_operation := PascalCoinSafeBox.Account(nSender).n_operation+1;
+        amount := PascalCoinSafeBox.Account(nSender).balance;
       end;
     end;
 
@@ -324,14 +321,14 @@ Var op : TPCOperation;
   i,j,n : Integer;
 begin
   DoCheckWalletKeysPwd;
-  If Not Assigned(FSourceNode) then Raise Exception.Create('No node to sign accounts');
+  If Not Assigned(PascalCoinNode) then Raise Exception.Create('No node to sign accounts');
   op := GetSelectedOperation;
   If Not Assigned(op) then exit;
   If Not (op is TOpMultiOperation) Then Raise Exception.Create('Is not a multioperation');
   mop := TOpMultiOperation(op);
   n := 0;
   For i:=0 to High(mop.Data.txSenders) do begin
-    j := FSourceWalletKeys.IndexOfAccountKey(FSourceNode.Bank.SafeBox.Account(mop.Data.txSenders[i].Account).accountInfo.accountKey);
+    j := FSourceWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(mop.Data.txSenders[i].Account).accountInfo.accountKey);
     If (j>=0) then begin
       // Can sign
       If (Assigned(FSourceWalletKeys.Key[j].PrivateKey)) then begin
@@ -340,7 +337,7 @@ begin
     end;
   end;
   For i:=0 to High(mop.Data.changesInfo) do begin
-    j := FSourceWalletKeys.IndexOfAccountKey(FSourceNode.Bank.SafeBox.Account(mop.Data.changesInfo[i].Account).accountInfo.accountKey);
+    j := FSourceWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(mop.Data.changesInfo[i].Account).accountInfo.accountKey);
     If (j>=0) then begin
       // Can sign
       If (Assigned(FSourceWalletKeys.Key[j].PrivateKey)) then begin
@@ -390,12 +387,12 @@ LBL_start_changer:
     new_name := '';
     new_type := 0;
     new_account_key := CT_TECDSA_Public_Nul;
-    If Assigned(FSourceNode) then begin
-      If (nAccount<FSourceNode.Bank.AccountsCount) then begin
-        n_operation := FSourceNode.Bank.SafeBox.Account(nAccount).n_operation+1;
-        new_name:= FSourceNode.Bank.SafeBox.Account(nAccount).name;
-        new_type:= FSourceNode.Bank.SafeBox.Account(nAccount).account_type;
-        new_account_key := FSourceNode.Bank.SafeBox.Account(nAccount).accountInfo.accountKey;
+    If Assigned(PascalCoinNode) then begin
+      If (nAccount<PascalCoinSafeBox.AccountsCount) then begin
+        n_operation := PascalCoinSafeBox.Account(nAccount).n_operation+1;
+        new_name:= PascalCoinSafeBox.Account(nAccount).name;
+        new_type:= PascalCoinSafeBox.Account(nAccount).account_type;
+        new_account_key := PascalCoinSafeBox.Account(nAccount).accountInfo.accountKey;
       end;
     end;
 
@@ -457,7 +454,7 @@ procedure TFRMOperationsExplorer.ActExecuteOperationUpdate(Sender: TObject);
 Var obj : TObject;
 begin
   obj := GetSelectedOperation;
-  TAction(Sender).Enabled:= ((Assigned(obj)) And (Assigned(FSourceNode)));
+  TAction(Sender).Enabled:= ((Assigned(obj)) And (Assigned(PascalCoinNode)));
 end;
 
 procedure TFRMOperationsExplorer.ActRemoveAccountFromMultioperationExecute(Sender: TObject);
@@ -469,7 +466,7 @@ procedure TFRMOperationsExplorer.ActRemoveAccountFromMultioperationUpdate(Sender
 Var op : TOpMultiOperation;
 begin
   op := GetSelectedMultiOperation;
-  TAction(Sender).Enabled:= (Assigned(FSourceNode)) And (Assigned(op));
+  TAction(Sender).Enabled:= (Assigned(PascalCoinNode)) And (Assigned(op));
 end;
 
 procedure TFRMOperationsExplorer.ActSignMultioperationExecute(Sender: TObject);
@@ -481,7 +478,7 @@ procedure TFRMOperationsExplorer.ActSignMultioperationUpdate(Sender: TObject);
 Var op : TOpMultiOperation;
 begin
   op := GetSelectedMultiOperation;
-  TAction(Sender).Enabled:= (Assigned(FSourceNode)) And (Assigned(op));
+  TAction(Sender).Enabled:= (Assigned(PascalCoinNode)) And (Assigned(op));
 end;
 
 procedure TFRMOperationsExplorer.AddOpChangeToMultioperationExecute(Sender: TObject);
@@ -498,10 +495,10 @@ procedure TFRMOperationsExplorer.ActExecuteOperationExecute(Sender: TObject);
 Var op : TPCOperation;
   errors : AnsiString;
 begin
-  If Not Assigned(FSourceNode) then Raise Exception.Create('No node to Execute');
+  If Not Assigned(PascalCoinNode) then Raise Exception.Create('No node to Execute');
   op := GetSelectedOperation;
   If Not Assigned(op) then exit;
-  If (FSourceNode.AddOperation(Nil,op,errors)) then begin
+  If (PascalCoinNode.AddOperation(Nil,op,errors)) then begin
     Application.MessageBox(PChar('Operation executed!'+#10+Op.ToString),PChar(Caption),MB_OK+MB_ICONINFORMATION);
   end else begin
     Application.MessageBox(PChar('ERROR EXECUTING!'+#10+Op.ToString+#10+#10+'ERROR:'+#10+errors),PChar(Caption),MB_OK+MB_ICONERROR);
@@ -560,8 +557,8 @@ end;
 
 procedure TFRMOperationsExplorer.miLoadFromBlockchainClick(Sender: TObject);
 begin
-  If Not Assigned(FSourceNode) then raise Exception.Create('No blockchain');
-  DoLoadFromStorageAssistant(FSourceNode.Bank.Storage);
+  If Not Assigned(PascalCoinNode) then raise Exception.Create('No blockchain');
+  DoLoadFromStorageAssistant(PascalCoinBank.Storage);
 end;
 
 procedure TFRMOperationsExplorer.MiLoadOperationsFromBlockchainFileClick(Sender: TObject);
@@ -573,7 +570,7 @@ begin
   Try
     od.Filter:='Blockchain file (*.blocks)|*.blocks|All files (*.*)|*.*|';
     If od.Execute then begin
-      filest := TFileStorage.Create(Self);
+      filest := TFileStorage.Create; // (Self);
       Try
         filest.ReadOnly:=True;
         filest.SetBlockChainFile(od.FileName);
@@ -606,10 +603,10 @@ end;
 
 procedure TFRMOperationsExplorer.SetSourceNode(AValue: TNode);
 begin
-  if FSourceNode=AValue then Exit;
-  FSourceNode:=AValue;
-  If Assigned(FSourceNode) then begin
-    FOperationsHashTree.CopyFromHashTree(FSourceNode.Operations.OperationsHashTree);
+  if PascalCoinNode=AValue then Exit;
+  PascalCoinNode:=AValue;
+  If Assigned(PascalCoinNode) then begin
+    FOperationsHashTree.CopyFromHashTree(PascalCoinNode.Operations.OperationsHashTree);
   end else FOperationsHashTree.ClearHastThree;
 end;
 
@@ -708,10 +705,10 @@ begin
       ms.Free;
       opht.Free;
     end;
-    If op.OperationToOperationResume(FSourceNode.Bank.BlocksCount,op,True,op.SignerAccount,opr) then begin
+    If op.OperationToOperationResume(PascalCoinSafeBox.BlocksCount,op,True,op.SignerAccount,opr) then begin
       jsonObj := TPCJSONObject.Create;
       Try
-        TPascalCoinJSONComp.FillOperationObject(opr,FSourceNode.Bank.BlocksCount,jsonObj);
+        TPascalCoinJSONComp.FillOperationObject(opr,PascalCoinSafeBox.BlocksCount,jsonObj);
         mOperationInfo.Lines.Add('JSON:');
         mOperationInfo.Lines.Add(jsonObj.ToJSON(False));
       Finally

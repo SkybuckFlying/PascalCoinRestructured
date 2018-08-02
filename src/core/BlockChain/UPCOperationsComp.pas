@@ -88,7 +88,7 @@ type
 implementation
 
 uses
-  UPCBank, SysUtils, UCrypto, UPascalCoinProtocol, UTime, UConst, UAccountComp, UStreamOp, ULog, UBaseType;
+  UPascalCoinBank, SysUtils, UCrypto, UPascalCoinProtocol, UTime, UConst, UAccountComp, UStreamOp, ULog, UBaseType, UPascalCoinSafeBox;
 
 { TPCOperationsComp }
 
@@ -103,7 +103,7 @@ Begin
         errors := 'No Bank';
         exit;
       end;
-      if (PascalCoinBank.BlocksCount<>OperationBlock.block) then begin
+      if (PascalCoinSafeBox.BlocksCount<>OperationBlock.block) then begin
         errors := 'Bank blockcount<>OperationBlock.Block';
         exit;
       end;
@@ -192,16 +192,16 @@ begin
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
     if Assigned(PascalCoinBank) then begin
-      FOperationBlock.protocol_version := PascalCoinBank.SafeBox.CurrentProtocol;
-      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
+      FOperationBlock.protocol_version := PascalCoinSafeBox.CurrentProtocol;
+      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinSafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
         FOperationBlock.protocol_version := CT_PROTOCOL_2; // If minting... upgrade to Protocol 2
-      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
+      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinSafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
         FOperationBlock.protocol_version := CT_PROTOCOL_3; // If minting... upgrade to Protocol 3
       end;
-      FOperationBlock.block := PascalCoinBank.BlocksCount;
-      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinBank.BlocksCount);
-      FOperationBlock.compact_target := PascalCoinBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
-      FOperationBlock.initial_safe_box_hash := PascalCoinBank.SafeBox.SafeBoxHash;
+      FOperationBlock.block := PascalCoinSafeBox.BlocksCount;
+      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinSafeBox.BlocksCount);
+      FOperationBlock.compact_target := PascalCoinSafebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+      FOperationBlock.initial_safe_box_hash := PascalCoinSafeBox.SafeBoxHash;
       If PascalCoinBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
         FOperationBlock.timestamp := PascalCoinBank.LastOperationBlock.timestamp;
     end else begin
@@ -259,7 +259,7 @@ begin
     FOperationBlock := Operations.FOperationBlock;
     FOperationBlock.account_key := lastopb.account_key; // Except AddressKey
 
-    FOperationBlock.compact_target := PascalCoinBank.Safebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+    FOperationBlock.compact_target := PascalCoinSafebox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
 
     FIsOnlyOperationBlock := Operations.FIsOnlyOperationBlock;
     FOperationsHashTree.CopyFromHashTree(Operations.FOperationsHashTree);
@@ -557,18 +557,18 @@ begin
     FOperationBlock.timestamp := UnivDateTimeToUnix(DateTime2UnivDateTime(now));
 
     if Assigned(PascalCoinBank) then begin
-      FOperationBlock.protocol_version := PascalCoinBank.SafeBox.CurrentProtocol;
-      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
+      FOperationBlock.protocol_version := PascalCoinSafeBox.CurrentProtocol;
+      If (FOperationBlock.protocol_version=CT_PROTOCOL_1) And (PascalCoinSafeBox.CanUpgradeToProtocol(CT_PROTOCOL_2)) then begin
         TLog.NewLog(ltinfo,ClassName,'New miner protocol version to 2 at sanitize');
         FOperationBlock.protocol_version := CT_PROTOCOL_2;
-      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinBank.SafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
+      end else if (FOperationBlock.protocol_version=CT_PROTOCOL_2) And (PascalCoinSafeBox.CanUpgradeToProtocol(CT_PROTOCOL_3)) then begin
         TLog.NewLog(ltinfo,ClassName,'New miner protocol version to 3 at sanitize');
         FOperationBlock.protocol_version := CT_PROTOCOL_3;
       end;
-      FOperationBlock.block := PascalCoinBank.BlocksCount;
-      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinBank.BlocksCount);
-      FOperationBlock.compact_target := PascalCoinBank.SafeBox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
-      FOperationBlock.initial_safe_box_hash := PascalCoinBank.SafeBox.SafeBoxHash;
+      FOperationBlock.block := PascalCoinSafeBox.BlocksCount;
+      FOperationBlock.reward := TPascalCoinProtocol.GetRewardForNewLine(PascalCoinSafeBox.BlocksCount);
+      FOperationBlock.compact_target := PascalCoinSafeBox.GetActualCompactTargetHash(FOperationBlock.protocol_version);
+      FOperationBlock.initial_safe_box_hash := PascalCoinSafeBox.SafeBoxHash;
       If PascalCoinBank.LastOperationBlock.timestamp>FOperationBlock.timestamp then
         FOperationBlock.timestamp := PascalCoinBank.LastOperationBlock.timestamp;
     end else begin

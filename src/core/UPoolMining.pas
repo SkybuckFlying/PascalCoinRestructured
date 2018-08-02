@@ -63,7 +63,7 @@ Type
     FPendingResponseMessages : TPCThreadList;
   protected
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create; // (AOwner : TComponent); override;
     Destructor Destroy; override;
     Procedure SendJSONRPCErrorResponse(const id : Variant; const error : String);
     Procedure SendJSONRPCResponse(result : TPCJSONObject; const id : Variant);
@@ -90,7 +90,7 @@ Type
   protected
     Procedure DoOnConnect; Override;
   public
-    Constructor Create(AOwner : TComponent); override;
+    Constructor Create; // (AOwner : TComponent); override;
     Property OnMinerMustChangeValues : TNotifyEvent read FOnMinerMustChangeValues write FOnMinerMustChangeValues;
     Property MinerValuesForWork : TMinerValuesForWork read FMinerValuesForWork write SetMinerValuesForWork;
     Procedure SubmitBlockFound(Const MinerValuesToGenerateBlock : TMinerValuesForWork; const Payload: TRawBytes; Timestamp, NOnce: Cardinal);
@@ -166,7 +166,7 @@ implementation
 
 Uses
   ULog, Variants, UTime, UNetProtocol, UTickCount, UPlatform, UOperationBlock, UNetData, UECDSA_Public, UAccountComp, UOperationsHashTree, UPCOperation, UBlockAccount,
-  UPascalCoinProtocol;
+  UPascalCoinProtocol, UPascalCoinBank, UPascalCoinSafeBox;
 
 Type TPendingResponseMessage = Record
        sendDateTime : TDateTime;
@@ -189,7 +189,7 @@ End;
 
 { TJSONRPCTcpIpClient }
 
-constructor TJSONRPCTcpIpClient.Create(AOwner: TComponent);
+constructor TJSONRPCTcpIpClient.Create; // ( AOwner: TComponent);
 begin
   inherited;
   FLastId := 1;
@@ -526,7 +526,7 @@ begin
     if l.count=0 then doAdd := true
     else begin
       P := l[l.Count-1];
-      if (FNodeNotifyEvents.Node.Operations.OperationsHashTree.HashTree<>P^.OperationsComp.OperationsHashTree.HashTree) then begin
+      if (PascalCoinNode.Operations.OperationsHashTree.HashTree<>P^.OperationsComp.OperationsHashTree.HashTree) then begin
         doAdd := (P^.SentDateTime + EncodeTime(0,0,CT_WAIT_SECONDS_BEFORE_SEND_NEW_JOB,0)) < Now;
       end else begin
         // No new operations waiting to be sent, but to prevent "old time mining", we will send new job with time:
@@ -536,9 +536,9 @@ begin
     if doAdd then begin
       New(P);
       P^.SentDateTime := now;
-      P^.SentMinTimestamp := TNetData.NetData.NetworkAdjustedTime.GetAdjustedTime;
-      if (P^.SentMinTimestamp<FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp) then begin
-        P^.SentMinTimestamp := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
+      P^.SentMinTimestamp := PascalNetData.NetworkAdjustedTime.GetAdjustedTime;
+      if (P^.SentMinTimestamp<PascalCoinBank.LastBlockFound.OperationBlock.timestamp) then begin
+        P^.SentMinTimestamp := PascalCoinBank.LastBlockFound.OperationBlock.timestamp;
       end;
       FillMinerOperations;
       P^.OperationsComp := TPCOperationsComp.Create;
@@ -547,9 +547,9 @@ begin
       P^.OperationsComp.BlockPayload := FMinerPayload;
       P^.OperationsComp.timestamp := P^.SentMinTimestamp; // Best practices 1.5.3
       OpB := P^.OperationsComp.OperationBlock;
-      if (OpB.block<>0) And (OpB.block <> (FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.block+1)) then begin
+      if (OpB.block<>0) And (OpB.block <> (PascalCoinBank.LastBlockFound.OperationBlock.block+1)) then begin
         // A new block is generated meanwhile ... do not include
-        TLog.NewLog(ltDebug,ClassName,'Generated a new block meanwhile ... '+TPCOperationsComp.OperationBlockToText(OpB)+'<>'+TPCOperationsComp.OperationBlockToText(FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock));
+        TLog.NewLog(ltDebug,ClassName,'Generated a new block meanwhile ... '+TPCOperationsComp.OperationBlockToText(OpB)+'<>'+TPCOperationsComp.OperationBlockToText(PascalCoinBank.LastBlockFound.OperationBlock));
         P^.OperationsComp.Free;
         Dispose(P);
         P := Nil;
@@ -619,7 +619,6 @@ begin
   FNodeNotifyEvents := TNodeNotifyEvents.Create(Nil);
   FNodeNotifyEvents.OnBlocksChanged := OnNodeNewBlock;
   FNodeNotifyEvents.OnOperationsChanged := OnNodeOperationsChanged;
-  FNodeNotifyEvents.Node := TNode.Node;
   FMinerOperations := TPCOperationsComp.Create;
   FMinerAccountKey := CT_TECDSA_Public_Nul;
   FMinerPayload := '';
@@ -634,7 +633,6 @@ begin
   FPoolThread.Terminate;
   FPoolThread.WaitFor;
   FreeAndNil(FPoolThread);
-  FNodeNotifyEvents.Node := Nil;
   FNodeNotifyEvents.OnBlocksChanged := Nil;
   FNodeNotifyEvents.OnOperationsChanged := Nil;
   FreeAndNil(FMinerOperations);
@@ -667,19 +665,19 @@ begin
   if method=CT_PoolMining_Method_STATUS then begin
     response_result := TPCJSONObject.Create;
     Try
-      response_result.GetAsVariant('block').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.block;
-      response_result.GetAsVariant('account_key').Value := TCrypto.ToHexaString( TAccountComp.AccountKey2RawString(FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.account_key) );
-      response_result.GetAsVariant('reward').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.reward;
-      response_result.GetAsVariant('fee').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.fee;
-      response_result.GetAsVariant('p_version').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.protocol_version;
-      response_result.GetAsVariant('p_available').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.protocol_available;
-      response_result.GetAsVariant('timestamp').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
-      response_result.GetAsVariant('target').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.compact_target;
-      response_result.GetAsVariant('nonce').Value := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.nonce;
-      response_result.GetAsVariant('payload').Value := TCrypto.ToHexaString( FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.block_payload );
-      response_result.GetAsVariant('initial_sbh').Value := TCrypto.ToHexaString( FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.initial_safe_box_hash );
-      response_result.GetAsVariant('operations_hash').Value := TCrypto.ToHexaString( FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.operations_hash );
-      response_result.GetAsVariant('pow').Value := TCrypto.ToHexaString( FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.proof_of_work );
+      response_result.GetAsVariant('block').Value := PascalCoinBank.LastBlockFound.OperationBlock.block;
+      response_result.GetAsVariant('account_key').Value := TCrypto.ToHexaString( TAccountComp.AccountKey2RawString(PascalCoinBank.LastBlockFound.OperationBlock.account_key) );
+      response_result.GetAsVariant('reward').Value := PascalCoinBank.LastBlockFound.OperationBlock.reward;
+      response_result.GetAsVariant('fee').Value := PascalCoinBank.LastBlockFound.OperationBlock.fee;
+      response_result.GetAsVariant('p_version').Value := PascalCoinBank.LastBlockFound.OperationBlock.protocol_version;
+      response_result.GetAsVariant('p_available').Value := PascalCoinBank.LastBlockFound.OperationBlock.protocol_available;
+      response_result.GetAsVariant('timestamp').Value := PascalCoinBank.LastBlockFound.OperationBlock.timestamp;
+      response_result.GetAsVariant('target').Value := PascalCoinBank.LastBlockFound.OperationBlock.compact_target;
+      response_result.GetAsVariant('nonce').Value := PascalCoinBank.LastBlockFound.OperationBlock.nonce;
+      response_result.GetAsVariant('payload').Value := TCrypto.ToHexaString( PascalCoinBank.LastBlockFound.OperationBlock.block_payload );
+      response_result.GetAsVariant('initial_sbh').Value := TCrypto.ToHexaString( PascalCoinBank.LastBlockFound.OperationBlock.initial_safe_box_hash );
+      response_result.GetAsVariant('operations_hash').Value := TCrypto.ToHexaString( PascalCoinBank.LastBlockFound.OperationBlock.operations_hash );
+      response_result.GetAsVariant('pow').Value := TCrypto.ToHexaString( PascalCoinBank.LastBlockFound.OperationBlock.proof_of_work );
       Client.SendJSONRPCResponse(response_result,id_value);
     Finally
       response_result.Free;
@@ -712,7 +710,7 @@ Var i,j : Integer;
   op : TPCOperation;
   Var errors : AnsiString;
 begin
-  MasterOp := FNodeNotifyEvents.Node.Operations;
+  MasterOp := PascalCoinNode.Operations;
   MasterOp.Lock;
   Try
     FMinerOperations.Lock;
@@ -815,7 +813,7 @@ begin
         P := l[i];
         // Best practices: Only will accept a solution if timestamp >= sent timestamp for this job (1.5.3)
         If (P^.SentMinTimestamp<=_timestamp) then begin
-          _targetPoW := FNodeNotifyEvents.Node.Bank.SafeBox.GetActualTargetHash(P^.OperationsComp.OperationBlock.protocol_version);
+          _targetPoW := PascalCoinSafeBox.GetActualTargetHash(P^.OperationsComp.OperationBlock.protocol_version);
           P^.OperationsComp.Update_And_RecalcPOW(_nOnce,_timestamp,_payload);
           if (P^.OperationsComp.OperationBlock.proof_of_work<=_targetPoW) then begin
             // Candidate!
@@ -832,12 +830,12 @@ begin
       FPoolJobs.UnlockList;
     End;
     if Assigned(nbOperations) then begin
-      If FNodeNotifyEvents.Node.AddNewBlockChain(nil,nbOperations,nba,errors) then begin
+      If PascalCoinNode.AddNewBlockChain(nil,nbOperations,nba,errors) then begin
         // CONGRATS !!!
         json := TPCJSONObject.Create;
         try
-          json.GetAsVariant('block').Value := FNodeNotifyEvents.Node.Bank.LastOperationBlock.block;
-          json.GetAsVariant('pow').Value := TCrypto.ToHexaString( FNodeNotifyEvents.Node.Bank.LastOperationBlock.proof_of_work );
+          json.GetAsVariant('block').Value := PascalCoinBank.LastOperationBlock.block;
+          json.GetAsVariant('pow').Value := TCrypto.ToHexaString( PascalCoinBank.LastOperationBlock.proof_of_work );
           json.GetAsVariant('payload').Value := nbOperations.BlockPayload;
           json.GetAsVariant('timestamp').Value := nbOperations.timestamp;
           json.GetAsVariant('nonce').Value := nbOperations.nonce;
@@ -918,9 +916,9 @@ begin
         TLog.NewLog(ltInfo,ClassName,'Creating new job for miner');
         New(P);
         P^.SentDateTime := now;
-        P^.SentMinTimestamp := TNetData.NetData.NetworkAdjustedTime.GetAdjustedTime;
-        if (P^.SentMinTimestamp<FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp) then begin
-          P^.SentMinTimestamp := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
+        P^.SentMinTimestamp := PascalNetData.NetworkAdjustedTime.GetAdjustedTime;
+        if (P^.SentMinTimestamp<PascalCoinBank.LastBlockFound.OperationBlock.timestamp) then begin
+          P^.SentMinTimestamp := PascalCoinBank.LastBlockFound.OperationBlock.timestamp;
         end;
         FillMinerOperations;
         P^.OperationsComp := TPCOperationsComp.Create;
@@ -928,8 +926,8 @@ begin
         P^.OperationsComp.AccountKey := FMinerAccountKey;
         P^.OperationsComp.BlockPayload := FMinerPayload;
         P^.OperationsComp.timestamp := P^.SentMinTimestamp; // Best practices 1.5.3
-        if (P^.OperationsComp.OperationBlock.block<>0) And (P^.OperationsComp.OperationBlock.block <> (FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.block+1)) then begin
-          TLog.NewLog(ltError,ClassName,'ERROR DEV 20170228-2 '+TPCOperationsComp.OperationBlockToText(P^.OperationsComp.OperationBlock)+'<>'+TPCOperationsComp.OperationBlockToText(FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock));
+        if (P^.OperationsComp.OperationBlock.block<>0) And (P^.OperationsComp.OperationBlock.block <> (PascalCoinBank.LastBlockFound.OperationBlock.block+1)) then begin
+          TLog.NewLog(ltError,ClassName,'ERROR DEV 20170228-2 '+TPCOperationsComp.OperationBlockToText(P^.OperationsComp.OperationBlock)+'<>'+TPCOperationsComp.OperationBlockToText(PascalCoinBank.LastBlockFound.OperationBlock));
           P^.OperationsComp.Free;
           Dispose(P);
           raise Exception.Create('ERROR DEV 20170228-2');
@@ -959,9 +957,9 @@ begin
     params.GetAsVariant('target').Value := Operations.OperationBlock.compact_target;
     params.GetAsVariant('target_pow').Value := TCrypto.ToHexaString(TPascalCoinProtocol.TargetFromCompact(Operations.OperationBlock.compact_target));
 
-    ts := TNetData.NetData.NetworkAdjustedTime.GetAdjustedTime;
-    if (ts<FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp) then begin
-      ts := FNodeNotifyEvents.Node.Bank.LastBlockFound.OperationBlock.timestamp;
+    ts := PascalNetData.NetworkAdjustedTime.GetAdjustedTime;
+    if (ts<PascalCoinBank.LastBlockFound.OperationBlock.timestamp) then begin
+      ts := PascalCoinBank.LastBlockFound.OperationBlock.timestamp;
     end;
     params.GetAsVariant('timestamp').Value := ts;
 
@@ -1039,7 +1037,7 @@ end;
 
 { TPoolMinerClient }
 
-constructor TPoolMinerClient.Create(AOwner: TComponent);
+constructor TPoolMinerClient.Create; // (AOwner: TComponent);
 begin
   FMinerValuesForWork := CT_TMinerValuesForWork_NULL;
   FPoolType:=ptNone;

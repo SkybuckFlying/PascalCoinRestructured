@@ -43,14 +43,14 @@ begin
     // NOTE: I'm in a separate thread
     // While in this function the ClientSocket connection will be active, when finishes the ClientSocket will be destroyed
     TLog.NewLog(ltInfo,Classname,'Starting ClientSocket accept '+Client.ClientRemoteAddr);
-    n := TNetServerClient.Create(Nil);
+    n := TNetServerClient.Create;
     Try
       DebugStep := 'Assigning client';
       n.SetClient(Client);
-      TNetData.NetData.IncStatistics(1,1,0,0,0,0);
-      TNetData.NetData.NodeServersAddresses.CleanBlackList(False);
+      PascalNetData.IncStatistics(1,1,0,0,0,0);
+      PascalNetData.NodeServersAddresses.CleanBlackList(False);
       DebugStep := 'Checking blacklisted';
-      if (TNetData.NetData.NodeServersAddresses.IsBlackListed(Client.RemoteHost)) then begin
+      if (PascalNetData.NodeServersAddresses.IsBlackListed(Client.RemoteHost)) then begin
         // Invalid!
         TLog.NewLog(ltinfo,Classname,'Refusing Blacklist ip: '+Client.ClientRemoteAddr);
         n.SendError(TNetTransferType.ntp_autosend,CT_NetOp_Error, 0,CT_NetError_IPBlackListed,'Your IP is blacklisted:'+Client.ClientRemoteAddr);
@@ -74,7 +74,7 @@ begin
         Until (Not n.Connected) Or (tc + 5000 < TPlatform.GetTickCount);
         sleep(5);
         DebugStep := 'Assigning old client';
-        n.SetClient( NetTcpIpClientClass.Create(Nil) );
+        n.SetClient( NetTcpIpClientClass.Create ); // (Nil) );
         sleep(500); // Delay - Sleep time before destroying (1.5.3)
         DebugStep := 'Freeing NetServerClient';
       Finally
@@ -97,16 +97,16 @@ begin
   end;
   inherited;
   if Active then begin
-    // TNode.Node.AutoDiscoverNodes(CT_Discover_IPs);
-  end else if TNetData.NetDataExists then begin
-    TNetData.NetData.DisconnectClients;
+    // PascalCoinNode.AutoDiscoverNodes(CT_Discover_IPs);
+  end else if Assigned(PascalNetData) then begin
+    PascalNetData.DisconnectClients;
   end;
 end;
 
 procedure TNetServer.SetMaxConnections(AValue: Integer);
 begin
   inherited SetMaxConnections(AValue);
-  TNetData.NetData.MaxConnections:=AValue;
+  PascalNetData.MaxConnections:=AValue;
 end;
 
 

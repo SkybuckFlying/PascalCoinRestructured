@@ -306,7 +306,7 @@ Uses UFolderHelper, UOpenSSL, UOpenSSLdef, UTime, UFileStorage,
   UThread, UOpTransaction, UECIES, UFRMPascalCoinWalletConfig,
   UFRMOperationsExplorer,
   UFRMAbout, UFRMOperation, UFRMWalletKeys, UFRMPayloadDecoder, UFRMNodesIp, UFRMMemoText, USettings, UNodeServerAddress, UNetData, UPtrInt,
-  UOrderedCardinalList, UNetServerClient, UAccountComp, UAccount, UECPrivateKey, UECDSA_Public, UNetStatistics;
+  UOrderedCardinalList, UNetServerClient, UAccountComp, UAccount, UECPrivateKey, UECDSA_Public, UNetStatistics, UPascalCoinSafeBox, UPascalCoinBank;
 
 Type
   TThreadActivate = Class(TPCThread)
@@ -319,9 +319,9 @@ Type
 procedure TThreadActivate.BCExecute;
 begin
   // Read Operations saved from disk
-  TNode.Node.InitSafeboxAndOperations; // New Build 2.1.4 to load pending operations buffer
-  TNode.Node.AutoDiscoverNodes(CT_Discover_IPs);
-  TNode.Node.NetServer.Active := true;
+  PascalCoinNode.InitSafeboxAndOperations; // New Build 2.1.4 to load pending operations buffer
+  PascalCoinNode.AutoDiscoverNodes(CT_Discover_IPs);
+  PascalCoinNode.NetServer.Active := true;
   Synchronize( FRMWallet.DoUpdateAccounts );
   Synchronize( FRMWallet.FinishedLoadingApp );
 end;
@@ -351,41 +351,40 @@ begin
     End;
     ips := FAppParams.ParamByName[CT_PARAM_TryToConnectOnlyWithThisFixedServers].GetAsString('');
     TNode.DecodeIpStringToNodeServerAddressArray(ips,nsarr);
-    TNetData.NetData.DiscoverFixedServersOnly(nsarr);
+    PascalNetData.DiscoverFixedServersOnly(nsarr);
     setlength(nsarr,0);
     // Creating Node:
-    FNode := TNode.Node;
-    FNode.NetServer.Port := FAppParams.ParamByName[CT_PARAM_InternetServerPort].GetAsInteger(CT_NetServer_Port);
-    FNode.PeerCache := FAppParams.ParamByName[CT_PARAM_PeerCache].GetAsString('')+';'+CT_Discover_IPs;
+    PascalCoinNode := TNode.Create;
+    PascalCoinNode.NetServer.Port := FAppParams.ParamByName[CT_PARAM_InternetServerPort].GetAsInteger(CT_NetServer_Port);
+    PascalCoinNode.PeerCache := FAppParams.ParamByName[CT_PARAM_PeerCache].GetAsString('')+';'+CT_Discover_IPs;
     // Create RPC server
     FRPCServer := TRPCServer.Create;
     FRPCServer.WalletKeys := WalletKeys;
     FRPCServer.Active := FAppParams.ParamByName[CT_PARAM_JSONRPCEnabled].GetAsBoolean(false);
     FRPCServer.ValidIPs := FAppParams.ParamByName[CT_PARAM_JSONRPCAllowedIPs].GetAsString('127.0.0.1');
-    WalletKeys.SafeBox := FNode.Bank.SafeBox;
+    WalletKeys.SafeBox := PascalCoinSafeBox;
     // Check Database
-    FNode.Bank.StorageClass := TFileStorage;
-    TFileStorage(FNode.Bank.Storage).DatabaseFolder := TFolderHelper.GetPascalCoinDataFolder+PathDelim+'Data';
-    TFileStorage(FNode.Bank.Storage).Initialize;
+    PascalCoinBank.StorageClass := TFileStorage;
+    TFileStorage(PascalCoinBank.Storage).DatabaseFolder := TFolderHelper.GetPascalCoinDataFolder+PathDelim+'Data';
+    TFileStorage(PascalCoinBank.Storage).Initialize;
     // Init Grid
     //FAccountsGrid.Node := FNode;
-    FSelectedAccountsGrid.Node := FNode;
+//    FSelectedAccountsGrid.Node := FNode; // Skybuck: init grid this later
     FWalletKeys.OnChanged.Add( OnWalletChanged );
-    FAccountsGrid.Node := FNode;
-    FOperationsAccountGrid.Node := FNode;
+//    FAccountsGrid.Node := FNode; // Skybuck: init grid later
+//    FOperationsAccountGrid.Node := FNode; // Skybuck: init grid later
     FBlockChainGrid.HashRateAverageBlocksCount := FAppParams.ParamByName[CT_PARAM_HashRateAvgBlocksCount].GetAsInteger(50);
     i := FAppParams.ParamByName[CT_PARAM_ShowHashRateAs].GetAsInteger(Integer({$IFDEF TESTNET}hr_Mega{$ELSE}hr_Tera{$ENDIF}));
     if (i<Integer(Low(TShowHashRateAs))) Or (i>Integer(High(TShowHashRateAs))) then i := Integer({$IFDEF TESTNET}hr_Mega{$ELSE}hr_Tera{$ENDIF});
     FBlockChainGrid.HashRateAs := TShowHashRateAs(i);
     // Reading database
     TThreadActivate.Create(false).FreeOnTerminate := true;
-    FNodeNotifyEvents.Node := FNode;
     // Init
-    TNetData.NetData.OnReceivedHelloMessage := OnReceivedHelloMessage;
-    TNetData.NetData.OnStatisticsChanged := OnNetStatisticsChanged;
-    TNetData.NetData.OnNetConnectionsUpdated := onNetConnectionsUpdated;
-    TNetData.NetData.OnNodeServersUpdated := OnNetNodeServersUpdated;
-    TNetData.NetData.OnBlackListUpdated := OnNetBlackListUpdated;
+    PascalNetData.OnReceivedHelloMessage := OnReceivedHelloMessage;
+    PascalNetData.OnStatisticsChanged := OnNetStatisticsChanged;
+    PascalNetData.OnNetConnectionsUpdated := onNetConnectionsUpdated;
+    PascalNetData.OnNodeServersUpdated := OnNetNodeServersUpdated;
+    PascalNetData.OnBlackListUpdated := OnNetBlackListUpdated;
     //
     TimerUpdateStatus.Interval := 1000;
     TimerUpdateStatus.Enabled := true;
@@ -477,7 +476,7 @@ begin
     for i := 0 to lbNetConnections.Items.Count - 1 do begin
       if lbNetConnections.Selected[i] then begin
         nc := TNetConnection(lbNetconnections.Items.Objects[i]);
-        if TNetData.NetData.ConnectionExistsAndActive(nc) then begin
+        if PascalNetData.ConnectionExistsAndActive(nc) then begin
           FNode.SendNodeMessage(nc,m,errors);
           memoMessages.Lines.Add(DateTimeToStr(now)+' Sent to '+nc.ClientRemoteAddr+' > '+m);
         end;
@@ -485,7 +484,7 @@ begin
     end;
   end else begin
     nc := TNetConnection(lbNetconnections.Items.Objects[lbNetconnections.ItemIndex]);
-    if TNetData.NetData.ConnectionExistsAndActive(nc) then begin
+    if PascalNetData.ConnectionExistsAndActive(nc) then begin
       FNode.SendNodeMessage(nc,m,errors);
       memoMessages.Lines.Add(DateTimeToStr(now)+' Sent to '+nc.ClientRemoteAddr+' > '+m);
     end;
@@ -532,7 +531,7 @@ Var i : integer;
  hh,nn,ss,ms : Word;
 begin
   Try
-    if Not TNetData.NetData.NetConnections.TryLockList(100,l) then exit;
+    if Not PascalNetData.NetConnections.TryLockList(100,l) then exit;
     try
       strings := memoNetConnections.Lines;
       sNSC := TStringList.Create;
@@ -581,7 +580,7 @@ begin
           end;
         end;
         strings.Clear;
-        strings.Add(Format('Connections Updated %s Clients:%d Servers:%d (valid servers:%d)',[DateTimeToStr(now),sNSC.Count,sRS.Count,TNetData.NetData.NetStatistics.ServersConnectionsWithResponse]));
+        strings.Add(Format('Connections Updated %s Clients:%d Servers:%d (valid servers:%d)',[DateTimeToStr(now),sNSC.Count,sRS.Count,PascalNetData.NetStatistics.ServersConnectionsWithResponse]));
         strings.AddStrings(sRS);
         strings.AddStrings(sNSC);
         if sDisc.Count>0 then begin
@@ -597,7 +596,7 @@ begin
       End;
       //CheckMining;
     finally
-      TNetData.NetData.NetConnections.UnlockList;
+      PascalNetData.NetConnections.UnlockList;
     end;
   Finally
     FMustProcessNetConnectionUpdated := false;
@@ -773,7 +772,7 @@ begin
   Strings.Add('');
   Strings.Add(Format('Current balance: %s',[TAccountComp.FormatMoney(account.balance)]));
   Strings.Add('');
-  Strings.Add(Format('Updated on block: %d  (%d blocks ago)',[account.updated_block,FNode.Bank.BlocksCount-account.updated_block]));
+  Strings.Add(Format('Updated on block: %d  (%d blocks ago)',[account.updated_block,PascalCoinSafeBox.BlocksCount-account.updated_block]));
   Strings.Add(Format('Public key type: %s',[TAccountComp.GetECInfoTxt(account.accountInfo.accountKey.EC_OpenSSL_NID)]));
   Strings.Add(Format('Base58 Public key: %s',[TAccountComp.AccountPublicKeyExport(account.accountInfo.accountKey)]));
   if TAccountComp.IsAccountForSale(account.accountInfo) then begin
@@ -786,12 +785,12 @@ begin
       Strings.Add('** Private sale **');
       Strings.Add(Format('New Base58 Public key: %s',[TAccountComp.AccountPublicKeyExport(account.accountInfo.new_publicKey)]));
       Strings.Add('');
-      if TAccountComp.IsAccountLocked(account.accountInfo,FNode.Bank.BlocksCount) then begin
+      if TAccountComp.IsAccountLocked(account.accountInfo,PascalCoinSafeBox.BlocksCount) then begin
         Strings.Add(Format('PURCHASE IS SECURE UNTIL BLOCK %d (current %d, remains %d)',
-          [account.accountInfo.locked_until_block,FNode.Bank.BlocksCount,account.accountInfo.locked_until_block-FNode.Bank.BlocksCount]));
+          [account.accountInfo.locked_until_block,PascalCoinSafeBox.BlocksCount,account.accountInfo.locked_until_block-PascalCoinSafeBox.BlocksCount]));
       end else begin
         Strings.Add(Format('PURCHASE IS NOT SECURE (Expired on block %d, current %d)',
-          [account.accountInfo.locked_until_block,FNode.Bank.BlocksCount]));
+          [account.accountInfo.locked_until_block,PascalCoinSafeBox.BlocksCount]));
       end;
     end;
   end;
@@ -802,7 +801,7 @@ var i : Integer;
   jsonObj : TPCJSONObject;
 begin
   If (not OperationResume.valid) then exit;
-  If OperationResume.Block<FNode.Bank.BlocksCount then
+  If OperationResume.Block<PascalCoinSafeBox.BlocksCount then
     if (OperationResume.NOpInsideBlock>=0) then begin
       Strings.Add(Format('Block: %d/%d',[OperationResume.Block,OperationResume.NOpInsideBlock]))
     end else begin
@@ -840,7 +839,7 @@ begin
   end;
   jsonObj := TPCJSONObject.Create;
   Try
-    TPascalCoinJSONComp.FillOperationObject(OperationResume,FNode.Bank.BlocksCount,jsonObj);
+    TPascalCoinJSONComp.FillOperationObject(OperationResume,PascalCoinSafeBox.BlocksCount,jsonObj);
     Strings.Add('JSON:');
     Strings.Add(jsonObj.ToJSON(False));
   Finally
@@ -876,15 +875,15 @@ begin
   FOrderedAccountsKeyList := Nil;
   TimerUpdateStatus.Enabled := false;
   FIsActivated := false;
-  FWalletKeys := TWalletKeysExt.Create(Self);
+  FWalletKeys := TWalletKeysExt.Create;
   for i := 0 to StatusBar.Panels.Count - 1 do begin
     StatusBar.Panels[i].Text := '';
   end;
-  FLog := TLog.Create(Self);
+  FLog := TLog.Create;
   FLog.OnNewLog := OnNewLog;
   FLog.SaveTypes := [];
   If Not ForceDirectories(TFolderHelper.GetPascalCoinDataFolder) then raise Exception.Create('Cannot create dir: '+TFolderHelper.GetPascalCoinDataFolder);
-  FAppParams := TAppParams.Create(self);
+  FAppParams := TAppParams.Create; // (self);
   FAppParams.FileName := TFolderHelper.GetPascalCoinDataFolder+PathDelim+'AppParams.prm';
   FNodeNotifyEvents := TNodeNotifyEvents.Create(Self);
   FNodeNotifyEvents.OnBlocksChanged := OnNewAccount;
@@ -995,25 +994,19 @@ begin
   //
   step := 'Assigning nil events';
   FLog.OnNewLog :=Nil;
-  FNodeNotifyEvents.Node := Nil;
-  FOperationsAccountGrid.Node := Nil;
-  FOperationsExplorerGrid.Node := Nil;
-  FPendingOperationsGrid.Node := Nil;
-  FAccountsGrid.Node := Nil;
-  FSelectedAccountsGrid.Node := Nil;
-  TNetData.NetData.OnReceivedHelloMessage := Nil;
-  TNetData.NetData.OnStatisticsChanged := Nil;
-  TNetData.NetData.OnNetConnectionsUpdated := Nil;
-  TNetData.NetData.OnNodeServersUpdated := Nil;
-  TNetData.NetData.OnBlackListUpdated := Nil;
+  PascalNetData.OnReceivedHelloMessage := Nil;
+  PascalNetData.OnStatisticsChanged := Nil;
+  PascalNetData.OnNetConnectionsUpdated := Nil;
+  PascalNetData.OnNodeServersUpdated := Nil;
+  PascalNetData.OnBlackListUpdated := Nil;
   //
 
   step := 'Destroying NodeNotifyEvents';
   FreeAndNil(FNodeNotifyEvents);
   //
   step := 'Assigning Nil to TNetData';
-  TNetData.NetData.OnReceivedHelloMessage := Nil;
-  TNetData.NetData.OnStatisticsChanged := Nil;
+  PascalNetData.OnReceivedHelloMessage := Nil;
+  PascalNetData.OnStatisticsChanged := Nil;
 
   step := 'Destroying grids operators';
   FreeAndNil(FOperationsAccountGrid);
@@ -1024,16 +1017,16 @@ begin
   FreeAndNil(FOrderedAccountsKeyList);
 
   step := 'Desactivating Node';
-  TNode.Node.NetServer.Active := false;
+  PascalCoinNode.NetServer.Active := false;
   FNode := Nil;
 
-  TNetData.NetData.Free;
+  PascalNetData.Free;
 
   step := 'Processing messages 1';
   Application.ProcessMessages;
 
   step := 'Destroying Node';
-  TNode.Node.Free;
+  PascalCoinNode.Free;
 
   step := 'Destroying Wallet';
   FreeAndNil(FWalletKeys);
@@ -1054,7 +1047,6 @@ procedure TFRMWallet.MiOperationsExplorerClick(Sender: TObject);
 begin
   With TFRMOperationsExplorer.Create(Self) do
   try
-    SourceNode := FNode;
     SourceWalletKeys := FWalletKeys;
     ShowModal;
   finally
@@ -1079,7 +1071,6 @@ Var F : TFRMAccountSelect;
 begin
   F := TFRMAccountSelect.Create(Self);
   try
-    F.Node := FNode;
     F.WalletKeys := FWalletKeys;
     F.ShowModal;
   finally
@@ -1267,13 +1258,13 @@ begin
   an64 := FAccountsGrid.AccountNumber(dgAccounts.Row);
   if an64<0 then an := 0
   else an := an64;
-  If an>=FNode.Bank.SafeBox.AccountsCount then exit;
-  start := FNode.Bank.SafeBox.Account(an);
-  while (an<FNode.Bank.SafeBox.AccountsCount)  do begin
-    if FNode.Bank.SafeBox.Account(an).balance>start.balance then break
+  If an>=PascalCoinSafeBox.AccountsCount then exit;
+  start := PascalCoinSafeBox.Account(an);
+  while (an<PascalCoinSafeBox.AccountsCount)  do begin
+    if PascalCoinSafeBox.Account(an).balance>start.balance then break
     else an := an + 1;
   end;
-  if (an<FNode.Bank.SafeBox.AccountsCount) then FAccountsGrid.MoveRowToAccount(an)
+  if (an<PascalCoinSafeBox.AccountsCount) then FAccountsGrid.MoveRowToAccount(an)
   else raise Exception.Create('Not found any account higher than '+TAccountComp.AccountNumberToAccountTxtNumber(start.account)+' with balance higher than '+
     TAccountComp.FormatMoney(start.balance));
 end;
@@ -1303,15 +1294,15 @@ begin
   PageControl.ActivePage := tsMyAccounts;
   PageControlChange(Nil);
   an64 := FAccountsGrid.AccountNumber(dgAccounts.Row);
-  if an64<0 then an := FNode.Bank.SafeBox.AccountsCount-1
+  if an64<0 then an := PascalCoinSafeBox.AccountsCount-1
   else an := an64;
-  If an>=FNode.Bank.SafeBox.AccountsCount then exit;
-  start := FNode.Bank.SafeBox.Account(an);
+  If an>=PascalCoinSafeBox.AccountsCount then exit;
+  start := PascalCoinSafeBox.Account(an);
   while (an>0)  do begin
-    if FNode.Bank.SafeBox.Account(an).balance>start.balance then break
+    if PascalCoinSafeBox.Account(an).balance>start.balance then break
     else an := an - 1;
   end;
-  if (FNode.Bank.SafeBox.Account(an).balance>start.balance) then FAccountsGrid.MoveRowToAccount(an)
+  if (PascalCoinSafeBox.Account(an).balance>start.balance) then FAccountsGrid.MoveRowToAccount(an)
   else raise Exception.Create('Not found any account lower than '+TAccountComp.AccountNumberToAccountTxtNumber(start.account)+' with balance higher than '+
     TAccountComp.FormatMoney(start.balance));
 end;
@@ -1392,7 +1383,7 @@ Var i,j,n : integer;
  l : TList;
  strings : TStrings;
 begin
-  l := TNetData.NetData.NodeServersAddresses.LockList;
+  l := PascalNetData.NodeServersAddresses.LockList;
   try
     strings := memoNetBlackLists.Lines;
     strings.BeginUpdate;
@@ -1418,7 +1409,7 @@ begin
       strings.EndUpdate;
     End;
   finally
-    TNetData.NetData.NodeServersAddresses.UnlockList;
+    PascalNetData.NodeServersAddresses.UnlockList;
   end;
 end;
 
@@ -1436,7 +1427,7 @@ Var i : integer;
  strings : TStrings;
  s : String;
 begin
-  l := TNetData.NetData.NodeServersAddresses.LockList;
+  l := PascalNetData.NodeServersAddresses.LockList;
   try
     strings := memoNetServers.Lines;
     strings.BeginUpdate;
@@ -1478,7 +1469,7 @@ begin
       strings.EndUpdate;
     End;
   finally
-    TNetData.NetData.NodeServersAddresses.UnlockList;
+    PascalNetData.NodeServersAddresses.UnlockList;
   end;
 end;
 
@@ -1490,7 +1481,7 @@ begin
     If FNode.NetServer.Active then begin
       StatusBar.Panels[0].Text := 'Active (Port '+Inttostr(FNode.NetServer.Port)+')';
     end else StatusBar.Panels[0].Text := 'Server stopped';
-    NS := TNetData.NetData.NetStatistics;
+    NS := PascalNetData.NetStatistics;
     StatusBar.Panels[1].Text := Format('Connections:%d Clients:%d Servers:%d - Rcvd:%d Kb Send:%d Kb',
       [NS.ActiveConnections,NS.ClientsConnections,NS.ServersConnections,NS.BytesReceived DIV 1024,NS.BytesSend DIV 1024]);
   end else begin
@@ -1570,14 +1561,14 @@ begin
   If (FLastNodesCacheUpdatedTS + EncodeTime(0,5,0,0) > Now) then exit; // Prevent continuous saving
   FLastNodesCacheUpdatedTS := Now;
   // Update node servers Peer Cache
-  nsarr := TNetData.NetData.NodeServersAddresses.GetValidNodeServers(true,0);
+  nsarr := PascalNetData.NodeServersAddresses.GetValidNodeServers(true,0);
   s := '';
   for i := low(nsarr) to High(nsarr) do begin
     if (s<>'') then s := s+';';
     s := s + nsarr[i].ip+':'+IntToStr( nsarr[i].port );
   end;
   FAppParams.ParamByName[CT_PARAM_PeerCache].SetAsString(s);
-  TNode.Node.PeerCache := s;
+  PascalCoinNode.PeerCache := s;
 end;
 
 procedure TFRMWallet.OnSelectedAccountsGridUpdated(Sender: TObject);
@@ -1599,21 +1590,32 @@ begin
   if PageControl.ActivePage=tsMyAccounts then begin
     //FAccountsGrid.Node := FNode;
     MiDecodePayload.Enabled := true;
-    FSelectedAccountsGrid.Node := FNode;
+//    FSelectedAccountsGrid.Node := FNode; // init grid later
   end else begin
     //FAccountsGrid.Node := Nil;
-    FSelectedAccountsGrid.Node := Nil;
+//    FSelectedAccountsGrid.Node := Nil; // init grid later
   end;
   if PageControl.ActivePage=tsPendingOperations then begin
-    FPendingOperationsGrid.Node := FNode;
+//    FPendingOperationsGrid.Node := FNode; // init grid later
     MiDecodePayload.Enabled := true;
-  end else FPendingOperationsGrid.Node := Nil;
-  if PageControl.ActivePage=tsBlockChain then FBlockChainGrid.Node := FNode
-  else FBlockChainGrid.Node := Nil;
+  end else
+  begin
+//    FPendingOperationsGrid.Node := Nil; // init grid later
+  end;
+  if PageControl.ActivePage=tsBlockChain then
+  begin
+//    FBlockChainGrid.Node := FNode; // init grid later
+  end else
+  begin
+//    FBlockChainGrid.Node := Nil; // init grid later
+  end;
   if PageControl.ActivePage=tsOperations then begin
-    FOperationsExplorerGrid.Node := FNode;
+//    FOperationsExplorerGrid.Node := FNode; // init grid later
     MiDecodePayload.Enabled := true;
-  end else FOperationsExplorerGrid.Node := Nil;
+  end else
+  begin
+//   FOperationsExplorerGrid.Node := Nil; // init grid later
+  end;
   if PageControl.ActivePage=tsMessages then begin
     UpdateAvailableConnections;
     FMessagesUnreadCount := 0;
@@ -1646,7 +1648,7 @@ begin
     ltarget := FSelectedAccountsGrid.LockAccountsList;
     Try
       for i := 0 to lsource.Count-1 do begin
-        if FWalletKeys.IndexOfAccountKey(FNode.Bank.SafeBox.Account(lsource.Get(i)).accountInfo.accountKey)<0 then raise Exception.Create(Format('You cannot operate with account %d because private key not found in your wallet',[lsource.Get(i)]));
+        if FWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(lsource.Get(i)).accountInfo.accountKey)<0 then raise Exception.Create(Format('You cannot operate with account %d because private key not found in your wallet',[lsource.Get(i)]));
         ltarget.Add(lsource.Get(i));
       end;
     Finally
@@ -1664,7 +1666,7 @@ Var l, selected : TOrderedCardinalList;
 begin
   an := FAccountsGrid.AccountNumber(dgAccounts.Row);
   if (an<0) then raise Exception.Create('No account selected');
-  if FWalletKeys.IndexOfAccountKey(FNode.Bank.SafeBox.Account(an).accountInfo.accountkey)<0 then
+  if FWalletKeys.IndexOfAccountKey(PascalCoinSafeBox.Account(an).accountInfo.accountkey)<0 then
     raise Exception.Create(Format('You cannot add %s account because private key not found in your wallet.'#10+#10+'You''re not the owner!',
       [TAccountComp.AccountNumberToAccountTxtNumber(an)]));
   // Add
@@ -1756,7 +1758,7 @@ begin
               l := FOrderedAccountsKeyList.AccountKeyList[j];
               for k := 0 to l.Count - 1 do begin
                 if applyfilter then begin
-                  acc := FNode.Bank.SafeBox.Account(l.Get(k));
+                  acc := PascalCoinSafeBox.Account(l.Get(k));
                   if (acc.balance>=FMinAccountBalance) And (acc.balance<=FMaxAccountBalance) then accl.Add(acc.account);
                 end else accl.Add(l.Get(k));
               end;
@@ -1770,7 +1772,7 @@ begin
               l := FOrderedAccountsKeyList.AccountKeyList[j];
               for k := 0 to l.Count - 1 do begin
                 if applyfilter then begin
-                  acc := FNode.Bank.SafeBox.Account(l.Get(k));
+                  acc := PascalCoinSafeBox.Account(l.Get(k));
                   if (acc.balance>=FMinAccountBalance) And (acc.balance<=FMaxAccountBalance) then accl.Add(acc.account);
                 end else accl.Add(l.Get(k));
               end;
@@ -1780,8 +1782,8 @@ begin
       end else begin
         // There is a filter... check every account...
         c := 0;
-        while (c<FNode.Bank.SafeBox.AccountsCount) do begin
-          acc := FNode.Bank.SafeBox.Account(c);
+        while (c<PascalCoinSafeBox.AccountsCount) do begin
+          acc := PascalCoinSafeBox.Account(c);
           if (acc.balance>=FMinAccountBalance) And (acc.balance<=FMaxAccountBalance) then accl.Add(acc.account);
           inc(c);
         end;
@@ -1791,7 +1793,7 @@ begin
     End;
     lblAccountsCount.Caption := inttostr(accl.Count);
   end else begin
-    lblAccountsCount.Caption := inttostr(FNode.Bank.AccountsCount);
+    lblAccountsCount.Caption := inttostr(PascalCoinSafeBox.AccountsCount);
   end;
   bbChangeKeyName.Enabled := cbExploreMyAccounts.Checked;
   // Show Totals:
@@ -1804,7 +1806,7 @@ Var i : integer;
  NC : TNetConnection;
  l : TList;
 begin
-  if Not TNetData.NetData.NetConnections.TryLockList(100,l) then exit;
+  if Not PascalNetData.NetConnections.TryLockList(100,l) then exit;
   try
     lbNetConnections.Items.BeginUpdate;
     Try
@@ -1827,7 +1829,7 @@ begin
       lbNetConnections.Items.EndUpdate;
     End;
   finally
-    TNetData.NetData.NetConnections.UnlockList;
+    PascalNetData.NetConnections.UnlockList;
   end;
 end;
 
@@ -1843,14 +1845,14 @@ begin
   mc := 0;
 //  hr := 0;
   if Assigned(FNode) then begin
-    if FNode.Bank.BlocksCount>0 then begin
-      lblCurrentBlock.Caption :=  Inttostr(FNode.Bank.BlocksCount)+' (0..'+Inttostr(FNode.Bank.BlocksCount-1)+')'; ;
+    if PascalCoinSafeBox.BlocksCount>0 then begin
+      lblCurrentBlock.Caption :=  Inttostr(PascalCoinSafeBox.BlocksCount)+' (0..'+Inttostr(PascalCoinSafeBox.BlocksCount-1)+')'; ;
     end else lblCurrentBlock.Caption :=  '(none)';
-    lblCurrentAccounts.Caption := Inttostr(FNode.Bank.AccountsCount);
-    lblCurrentBlockTime.Caption := UnixTimeToLocalElapsedTime(FNode.Bank.LastOperationBlock.timestamp);
+    lblCurrentAccounts.Caption := Inttostr(PascalCoinSafeBox.AccountsCount);
+    lblCurrentBlockTime.Caption := UnixTimeToLocalElapsedTime(PascalCoinBank.LastOperationBlock.timestamp);
     lblOperationsPending.Caption := Inttostr(FNode.Operations.Count);
     lblCurrentDifficulty.Caption := InttoHex(FNode.Operations.OperationBlock.compact_target,8);
-    favg := FNode.Bank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage);
+    favg := PascalCoinBank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage);
     f := (CT_NewLineSecondsAvg - favg) / CT_NewLineSecondsAvg;
     lblTimeAverage.Caption := 'Last '+Inttostr(CT_CalcNewTargetBlocksAverage)+': '+FormatFloat('0.0',favg)+' sec. (Optimal '+Inttostr(CT_NewLineSecondsAvg)+'s) Deviation '+FormatFloat('0.00%',f*100);
     if favg>=CT_NewLineSecondsAvg then begin
@@ -1859,11 +1861,11 @@ begin
       lblTimeAverage.Font.Color := clOlive;
     end;
     lblTimeAverageAux.Caption := Format('Last %d: %s sec. - %d: %s sec. - %d: %s sec. - %d: %s sec. - %d: %s sec.',[
-        CT_CalcNewTargetBlocksAverage * 2 ,FormatFloat('0.0',FNode.Bank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage * 2)),
-        ((CT_CalcNewTargetBlocksAverage * 3) DIV 2) ,FormatFloat('0.0',FNode.Bank.GetActualTargetSecondsAverage((CT_CalcNewTargetBlocksAverage * 3) DIV 2)),
-        ((CT_CalcNewTargetBlocksAverage DIV 4)*3),FormatFloat('0.0',FNode.Bank.GetActualTargetSecondsAverage(((CT_CalcNewTargetBlocksAverage DIV 4)*3))),
-        CT_CalcNewTargetBlocksAverage DIV 2,FormatFloat('0.0',FNode.Bank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage DIV 2)),
-        CT_CalcNewTargetBlocksAverage DIV 4,FormatFloat('0.0',FNode.Bank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage DIV 4))]);
+        CT_CalcNewTargetBlocksAverage * 2 ,FormatFloat('0.0',PascalCoinBank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage * 2)),
+        ((CT_CalcNewTargetBlocksAverage * 3) DIV 2) ,FormatFloat('0.0',PascalCoinBank.GetActualTargetSecondsAverage((CT_CalcNewTargetBlocksAverage * 3) DIV 2)),
+        ((CT_CalcNewTargetBlocksAverage DIV 4)*3),FormatFloat('0.0',PascalCoinBank.GetActualTargetSecondsAverage(((CT_CalcNewTargetBlocksAverage DIV 4)*3))),
+        CT_CalcNewTargetBlocksAverage DIV 2,FormatFloat('0.0',PascalCoinBank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage DIV 2)),
+        CT_CalcNewTargetBlocksAverage DIV 4,FormatFloat('0.0',PascalCoinBank.GetActualTargetSecondsAverage(CT_CalcNewTargetBlocksAverage DIV 4))]);
   end else begin
     isMining := false;
     lblCurrentBlock.Caption := '';
@@ -1949,7 +1951,7 @@ begin
   if Assigned(FNode) then begin
     if FNode.IsBlockChainValid(errors) then begin
       StatusBar.Panels[2].Text := Format('Last account time:%s',
-       [FormatDateTime('dd/mm/yyyy hh:nn:ss',UnivDateTime2LocalDateTime(UnixToUnivDateTime( FNode.Bank.LastOperationBlock.timestamp )))]);
+       [FormatDateTime('dd/mm/yyyy hh:nn:ss',UnivDateTime2LocalDateTime(UnixToUnivDateTime( PascalCoinBank.LastOperationBlock.timestamp )))]);
     end else begin
       StatusBar.Panels[2].Text := 'NO BLOCKCHAIN: '+errors;
     end;
@@ -1966,11 +1968,11 @@ begin
     lblNodeStatus.Caption := 'Initializing...';
   end else begin
     If FNode.IsReady(status) then begin
-      if TNetData.NetData.NetStatistics.ActiveConnections>0 then begin
+      if PascalNetData.NetStatistics.ActiveConnections>0 then begin
         lblNodeStatus.Font.Color := clGreen;
-        if TNetData.NetData.IsDiscoveringServers then begin
+        if PascalNetData.IsDiscoveringServers then begin
           lblNodeStatus.Caption := 'Discovering servers';
-        end else if TNetData.NetData.IsGettingNewBlockChainFromClient then begin
+        end else if PascalNetData.IsGettingNewBlockChainFromClient then begin
           lblNodeStatus.Caption := 'Obtaining new blockchain';
         end else begin
           lblNodeStatus.Caption := 'Running';
@@ -2003,7 +2005,7 @@ Var i,last_i : Integer;
   s : AnsiString;
 begin
   If (Not Assigned(FOrderedAccountsKeyList)) And (Assigned(FNode)) Then begin
-    FOrderedAccountsKeyList := TOrderedAccountKeysList.Create(FNode.Bank.SafeBox,false);
+    FOrderedAccountsKeyList := TOrderedAccountKeysList.Create(PascalCoinSafeBox,false);
     FNodeNotifyEvents.WatchKeys := FOrderedAccountsKeyList;
   end;
   if (cbMyPrivateKeys.ItemIndex>=0) then last_i := PtrInt(cbMyPrivateKeys.Items.Objects[cbMyPrivateKeys.ItemIndex])
